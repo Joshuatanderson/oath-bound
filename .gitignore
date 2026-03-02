@@ -23,6 +23,9 @@ yarn-error.log*
 # env files
 .env*
 
+# supabase CLI temp files
+**/.temp/
+
 # OAuth client secrets
 client_secret_*.json
 
