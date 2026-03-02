@@ -25,7 +25,10 @@ license (required): pull from SPDX. Apache-2.0 should be default. (more protecti
 compatibility(not required):	Max 500 characters. Indicates environment requirements (intended product, system packages, network access, etc.).
 allowed-tools(not required):	Space-delimited list of pre-approved tools the skill may use. (Experimental)
 
-Actual skill info below
+Actual skill standard from anthropic below
 
-
-### ROADMAP: For the beginning, don't include /scripts, /references, or /assets. Future versions should.
+skill-name/
+├── SKILL.md          (required)
+├── scripts/          (optional)
+├── references/       (optional)
+└── assets/           (optional)
