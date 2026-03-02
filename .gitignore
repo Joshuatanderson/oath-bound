@@ -23,6 +23,9 @@ yarn-error.log*
 # env files
 .env*
 
+# OAuth client secrets
+client_secret_*.json
+
 # vercel
 .vercel
 
