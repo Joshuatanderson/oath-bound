@@ -1,0 +1,3 @@
+# Bun configuration for supabase skill
+# Run from project root: bun .claude/skills/supabase/script.ts
+# Bun auto-loads .env.local from cwd (project root)
