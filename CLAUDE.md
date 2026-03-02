@@ -8,6 +8,8 @@ Less is more. Complexity breeds bugs. State should only be used when necessary, 
 - Never write code that silences failures from the user. Instead, provide clear error messages and consult with the user on how to handle unclear fail cases - this is important to not sweep issues under the rug.
 - Test our own code when possible. Don't test truisms, or try to test third party code.
 
+# Database
+Whenever you will have to read or write to the database, NEVER assume you know structure. always look at our frontend/lib/database.types.ts file first, and read the relevant types
 
 ## Design
 - always use shadcn and lucide as a base. Consult the user before pulling in any other packages. 
@@ -32,3 +34,6 @@ your context is critical. Do not pollute it.
 ## Skills
 - if you are interacting w an api that is one off, don't worry about making a skill.
 - if you are interacting with an api that will likely be used again, consider making a skill - this can be a subagent/team's task, and then all future instances will benefit.
+
+## Context for deployment
+- you are deployed at oathbound.ai

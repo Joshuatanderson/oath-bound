@@ -32,3 +32,11 @@ skill-name/
 ├── scripts/          (optional)
 ├── references/       (optional)
 └── assets/           (optional)
+
+
+### on chain storage
+subject:   sha256("skill:josh/code-review")
+claim:     "register_skill"
+target:    sha256(deterministic tar bytes)
+evidence:  null
+uri:       "https://store.oathbound.ai/skills/josh/code-review/v1.tar"
