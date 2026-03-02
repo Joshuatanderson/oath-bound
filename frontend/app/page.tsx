@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { User } from "@supabase/supabase-js";
 import {
   Select,
   SelectContent,
@@ -16,11 +18,15 @@ import {
   validateSkill,
   VALID_LICENSES,
   ALLOWED_DIRS,
+  MAX_UPLOAD_SIZE,
+  MAX_FILE_COUNT,
   type SkillFile,
   type ValidationCheck,
   type ParsedSkill,
 } from "@/lib/skill-validator";
-import { supabase } from "@/lib/supabase";
+import { getBrowserClient } from "@/lib/supabase.client";
+
+const supabase = getBrowserClient();
 
 // ---------------------------------------------------------------------------
 // Upload state persisted across steps
@@ -45,9 +51,14 @@ const EMPTY_UPLOAD: UploadState = {
 // ---------------------------------------------------------------------------
 
 export default function Home() {
+  const [user, setUser] = useState<User | null>(null);
   const [step, setStep] = useState<1 | 2>(1);
   const [upload, setUpload] = useState<UploadState>(EMPTY_UPLOAD);
   const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+  }, []);
 
   // Form fields (step 2)
   const [name, setName] = useState("");
@@ -69,7 +80,27 @@ export default function Home() {
     });
   }
 
+  function rejectUpload(message: string) {
+    setUpload({
+      ...EMPTY_UPLOAD,
+      checks: [{ passed: false, message }],
+    });
+  }
+
   async function processFiles(fileList: FileList) {
+    if (fileList.length > MAX_FILE_COUNT) {
+      return rejectUpload(`Too many files: ${fileList.length} (maximum ${MAX_FILE_COUNT})`);
+    }
+    let totalBytes = 0;
+    for (let i = 0; i < fileList.length; i++) {
+      totalBytes += fileList[i].size;
+    }
+    if (totalBytes > MAX_UPLOAD_SIZE) {
+      return rejectUpload(
+        `Upload too large: ${(totalBytes / (1024 * 1024)).toFixed(1)} MB (maximum ${MAX_UPLOAD_SIZE / (1024 * 1024)} MB)`
+      );
+    }
+
     const results: SkillFile[] = [];
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
@@ -87,22 +118,22 @@ export default function Home() {
     const items = e.dataTransfer.items;
     if (!items?.length) return;
 
-    const allFiles: SkillFile[] = [];
+    // Phase 1: collect File objects with paths (without reading content)
+    const pending: { file: File; path: string }[] = [];
 
-    async function readEntry(entry: FileSystemEntry, basePath: string) {
+    async function collectEntry(entry: FileSystemEntry, basePath: string) {
       if (entry.isFile) {
         const file = await new Promise<File>((resolve) =>
           (entry as FileSystemFileEntry).file(resolve)
         );
-        const content = await file.text();
-        allFiles.push({ path: `${basePath}/${file.name}`, content });
+        pending.push({ file, path: `${basePath}/${file.name}` });
       } else if (entry.isDirectory) {
         const reader = (entry as FileSystemDirectoryEntry).createReader();
         const entries = await new Promise<FileSystemEntry[]>((resolve) =>
           reader.readEntries(resolve)
         );
         for (const child of entries) {
-          await readEntry(child, `${basePath}/${entry.name}`);
+          await collectEntry(child, `${basePath}/${entry.name}`);
         }
       }
     }
@@ -116,15 +147,32 @@ export default function Home() {
             reader.readEntries(resolve)
           );
           for (const child of entries) {
-            await readEntry(child, entry.name);
+            await collectEntry(child, entry.name);
           }
         } else {
           const file = items[i].getAsFile();
           if (file) {
-            allFiles.push({ path: file.name, content: await file.text() });
+            pending.push({ file, path: file.name });
           }
         }
       }
+    }
+
+    // Phase 2: validate sizes before reading content
+    if (pending.length > MAX_FILE_COUNT) {
+      return rejectUpload(`Too many files: ${pending.length} (maximum ${MAX_FILE_COUNT})`);
+    }
+    const totalBytes = pending.reduce((sum, p) => sum + p.file.size, 0);
+    if (totalBytes > MAX_UPLOAD_SIZE) {
+      return rejectUpload(
+        `Upload too large: ${(totalBytes / (1024 * 1024)).toFixed(1)} MB (maximum ${MAX_UPLOAD_SIZE / (1024 * 1024)} MB)`
+      );
+    }
+
+    // Phase 3: read content
+    const allFiles: SkillFile[] = [];
+    for (const { file, path } of pending) {
+      allFiles.push({ path, content: await file.text() });
     }
 
     applyUpload(allFiles);
@@ -181,24 +229,34 @@ export default function Home() {
     setSubmitting(true);
     setSubmitError(null);
 
-    const { error } = await supabase.from("skills").insert({
-      name,
-      description,
-      license,
-      compatibility: compatibility || null,
-      allowed_tools: allowedTools || null,
-      body: skillBody,
-      files: upload.files,
-    });
+    try {
+      const res = await fetch("/api/skills", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          description,
+          license,
+          compatibility: compatibility || null,
+          allowedTools: allowedTools || null,
+          files: upload.files,
+        }),
+      });
 
-    setSubmitting(false);
+      const data = await res.json();
 
-    if (error) {
-      setSubmitError(error.message);
-      return;
+      if (!res.ok) {
+        setSubmitError(data.error ?? "Something went wrong");
+        setSubmitting(false);
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setSubmitError("Network error — please try again");
     }
 
-    setSubmitted(true);
+    setSubmitting(false);
   }
 
   // ------ Render ------
@@ -208,7 +266,36 @@ export default function Home() {
       <main className="flex w-full max-w-2xl flex-col gap-16 px-6 py-20">
         {/* Header */}
         <div className="flex flex-col gap-4">
-          <h1 className="text-4xl font-bold tracking-tight">Oath Bound</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-4xl font-bold tracking-tight">Oath Bound</h1>
+            {user ? (
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={async () => {
+                    await supabase.auth.signOut();
+                    setUser(null);
+                  }}
+                >
+                  Sign out
+                </Button>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage
+                    src={user.user_metadata?.avatar_url}
+                    alt={user.user_metadata?.full_name ?? "User"}
+                  />
+                  <AvatarFallback>
+                    {user.email?.charAt(0).toUpperCase() ?? "?"}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+            ) : (
+              <Button variant="outline" size="sm" asChild>
+                <a href="/login">Sign in</a>
+              </Button>
+            )}
+          </div>
           <p className="text-lg text-muted-foreground">
             Attest your skills on-chain. Build trust through verifiable claims.
           </p>
