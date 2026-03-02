@@ -20,6 +20,7 @@ import {
   type ValidationCheck,
   type ParsedSkill,
 } from "@/lib/skill-validator";
+import { supabase } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
 // Upload state persisted across steps
@@ -163,20 +164,41 @@ export default function Home() {
 
   // ------ Submit ------
 
-  const canSubmit = name.trim() !== "" && description.trim() !== "" && license !== "";
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  const canSubmit =
+    name.trim() !== "" &&
+    description.trim() !== "" &&
+    license !== "" &&
+    !submitting;
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
-    console.log("Skill submitted:", {
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    const { error } = await supabase.from("skills").insert({
       name,
       description,
       license,
-      compatibility,
-      allowedTools,
+      compatibility: compatibility || null,
+      allowed_tools: allowedTools || null,
       body: skillBody,
+      files: upload.files,
     });
-    console.log("Files:", upload.files);
+
+    setSubmitting(false);
+
+    if (error) {
+      setSubmitError(error.message);
+      return;
+    }
+
+    setSubmitted(true);
   }
 
   // ------ Render ------
@@ -193,17 +215,19 @@ export default function Home() {
         </div>
 
         {/* Step indicator */}
-        <div className="flex gap-6 text-sm">
-          <span className={step === 1 ? "font-bold" : "text-muted-foreground"}>
-            1. Upload
-          </span>
-          <span className={step === 2 ? "font-bold" : "text-muted-foreground"}>
-            2. Review & Edit
-          </span>
-        </div>
+        {!submitted && (
+          <div className="flex gap-6 text-sm">
+            <span className={step === 1 ? "font-bold" : "text-muted-foreground"}>
+              1. Upload
+            </span>
+            <span className={step === 2 ? "font-bold" : "text-muted-foreground"}>
+              2. Review & Edit
+            </span>
+          </div>
+        )}
 
         {/* Step 1: Upload */}
-        {step === 1 && (
+        {!submitted && step === 1 && (
           <div className="flex flex-col gap-6">
             {/* Expected format */}
             <div className="flex flex-col gap-3">
@@ -325,7 +349,7 @@ export default function Home() {
         )}
 
         {/* Step 2: Review & Edit */}
-        {step === 2 && (
+        {!submitted && step === 2 && (
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             <h2 className="text-2xl font-semibold tracking-tight">
               Review & Edit
@@ -412,6 +436,11 @@ export default function Home() {
               </pre>
             </div>
 
+            {/* Error */}
+            {submitError && (
+              <p className="text-sm text-destructive">{submitError}</p>
+            )}
+
             {/* Actions */}
             <div className="flex gap-3">
               <Button
@@ -419,14 +448,39 @@ export default function Home() {
                 variant="outline"
                 size="lg"
                 onClick={goBackToUpload}
+                disabled={submitting}
               >
                 Back
               </Button>
               <Button type="submit" size="lg" disabled={!canSubmit}>
-                Submit Skill
+                {submitting ? "Submitting\u2026" : "Submit Skill"}
               </Button>
             </div>
           </form>
+        )}
+
+        {/* Success */}
+        {submitted && (
+          <div className="flex flex-col gap-4">
+            <h2 className="text-2xl font-semibold tracking-tight">
+              Skill Submitted
+            </h2>
+            <p className="text-muted-foreground">
+              &ldquo;{name}&rdquo; has been saved.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="w-fit"
+              onClick={() => {
+                setSubmitted(false);
+                reset();
+              }}
+            >
+              Submit another
+            </Button>
+          </div>
         )}
       </main>
     </div>
