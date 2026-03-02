@@ -7,10 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "bun test"
+    "test": "bun test",
+    "typegen": "bunx supabase gen types typescript --project-id mjnfqagwuewhgwbtrdgs --schema public > lib/database.types.ts"
   },
   "dependencies": {
     "@mysten/sui": "^2.5.0",
+    "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -33,6 +35,7 @@
     "bun-types": "^1.3.10",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "supabase": "^2.76.15",
     "tailwindcss": "^4",
     "typescript": "^5"
   },
