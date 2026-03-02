@@ -14,7 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
-      authors: {
+      skills: {
+        Row: {
+          allowed_tools: string | null
+          compatibility: string | null
+          created_at: string | null
+          description: string
+          id: string
+          license: Database["public"]["Enums"]["license_type"]
+          name: string
+          namespace: string
+          storage_path: string
+          tar_hash: string
+          updated_at: string | null
+          user_id: string
+          version: number
+        }
+        Insert: {
+          allowed_tools?: string | null
+          compatibility?: string | null
+          created_at?: string | null
+          description: string
+          id?: string
+          license?: Database["public"]["Enums"]["license_type"]
+          name: string
+          namespace: string
+          storage_path: string
+          tar_hash: string
+          updated_at?: string | null
+          user_id: string
+          version?: number
+        }
+        Update: {
+          allowed_tools?: string | null
+          compatibility?: string | null
+          created_at?: string | null
+          description?: string
+          id?: string
+          license?: Database["public"]["Enums"]["license_type"]
+          name?: string
+          namespace?: string
+          storage_path?: string
+          tar_hash?: string
+          updated_at?: string | null
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "skills_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
         Row: {
           created_at: string | null
           display_name: string | null
@@ -38,50 +94,6 @@ export type Database = {
         }
         Relationships: []
       }
-      skills: {
-        Row: {
-          allowed_tools: string | null
-          author_id: string
-          compatibility: string | null
-          created_at: string | null
-          description: string | null
-          id: string
-          license: string | null
-          name: string
-          sha256: string
-        }
-        Insert: {
-          allowed_tools?: string | null
-          author_id: string
-          compatibility?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          license?: string | null
-          name: string
-          sha256: string
-        }
-        Update: {
-          allowed_tools?: string | null
-          author_id?: string
-          compatibility?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          license?: string | null
-          name?: string
-          sha256?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "skills_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "authors"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
@@ -90,7 +102,18 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      license_type:
+        | "MIT"
+        | "APACHE-2.0"
+        | "BSD-2-CLAUSE"
+        | "BSD-3-CLAUSE"
+        | "GPL-3.0-ONLY"
+        | "AGPL-3.0-ONLY"
+        | "ISC"
+        | "UNLICENSE"
+        | "BUSL-1.1"
+        | "MPL-2.0"
+        | "PROPRIETARY"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -217,6 +240,20 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      license_type: [
+        "MIT",
+        "APACHE-2.0",
+        "BSD-2-CLAUSE",
+        "BSD-3-CLAUSE",
+        "GPL-3.0-ONLY",
+        "AGPL-3.0-ONLY",
+        "ISC",
+        "UNLICENSE",
+        "BUSL-1.1",
+        "MPL-2.0",
+        "PROPRIETARY",
+      ],
+    },
   },
 } as const
