@@ -4,6 +4,8 @@ import {
   validateSkill,
   VALID_LICENSES,
   ALLOWED_DIRS,
+  MAX_UPLOAD_SIZE,
+  MAX_FILE_COUNT,
   type SkillFile,
 } from "./skill-validator";
 
@@ -397,6 +399,61 @@ describe("validateSkill — edge cases", () => {
             path: "my-skill/references/a/b/c/d.md",
             content: "deep ref",
           },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateSkill — upload size limits
+// ---------------------------------------------------------------------------
+
+describe("validateSkill — upload size limits", () => {
+  test("rejects when file count exceeds limit", () => {
+    const files: SkillFile[] = validSkillFiles();
+    for (let i = 0; i < MAX_FILE_COUNT; i++) {
+      files.push({ path: `my-skill/scripts/file-${i}.sh`, content: "#!/bin/bash" });
+    }
+    const result = validateSkill(files);
+    expect(result.canProceed).toBe(false);
+    expect(result.checks.some((c) => c.message.includes("Too many files"))).toBe(true);
+  });
+
+  test("accepts file count at limit", () => {
+    const files: SkillFile[] = validSkillFiles();
+    for (let i = 0; i < MAX_FILE_COUNT - 1; i++) {
+      files.push({ path: `my-skill/scripts/file-${i}.sh`, content: "#!/bin/bash" });
+    }
+    expect(files.length).toBe(MAX_FILE_COUNT);
+    const result = validateSkill(files);
+    expect(result.canProceed).toBe(true);
+  });
+
+  test("rejects total upload exceeding size limit", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/big.sh", content: "x".repeat(MAX_UPLOAD_SIZE + 1) },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+    expect(result.checks.some((c) => c.message.includes("Upload too large"))).toBe(true);
+  });
+
+  test("accepts total upload at size limit", () => {
+    // SKILL.md takes some bytes, so fill remaining space
+    const skillContent = buildSkillMd(
+      { name: "my-skill", description: "A useful skill", license: "Apache-2.0" },
+      "# My Skill\n\nDo the thing."
+    );
+    const remaining = MAX_UPLOAD_SIZE - skillContent.length;
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/fill.sh", content: "x".repeat(remaining) },
         ],
       })
     );

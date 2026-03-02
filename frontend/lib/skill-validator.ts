@@ -39,6 +39,9 @@ export const VALID_LICENSES = [
 
 export const ALLOWED_DIRS = ["scripts", "references", "assets"] as const;
 
+export const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10 MB total upload
+export const MAX_FILE_COUNT = 50;
+
 const NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 export function parseFrontmatter(content: string): {
@@ -66,6 +69,25 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
   // Empty file list
   if (files.length === 0) {
     checks.push({ passed: false, message: "No files uploaded" });
+    return { checks, parsed: null, canProceed: false };
+  }
+
+  // File count limit
+  if (files.length > MAX_FILE_COUNT) {
+    checks.push({
+      passed: false,
+      message: `Too many files: ${files.length} (maximum ${MAX_FILE_COUNT})`,
+    });
+    return { checks, parsed: null, canProceed: false };
+  }
+
+  // Total size limit
+  const totalSize = files.reduce((sum, f) => sum + f.content.length, 0);
+  if (totalSize > MAX_UPLOAD_SIZE) {
+    checks.push({
+      passed: false,
+      message: `Upload too large: ${(totalSize / (1024 * 1024)).toFixed(1)} MB (maximum ${MAX_UPLOAD_SIZE / (1024 * 1024)} MB)`,
+    });
     return { checks, parsed: null, canProceed: false };
   }
 
