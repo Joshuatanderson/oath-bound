@@ -20,9 +20,12 @@ const supabase = getBrowserClient();
 
 export function SiteHeader() {
   const [user, setUser] = useState<User | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const match = document.cookie.match(/(?:^|; )ob_username=([^;]*)/);
+    if (match) setUsername(decodeURIComponent(match[1]));
   }, []);
 
   return (
@@ -63,6 +66,11 @@ export function SiteHeader() {
                   <p className="text-sm font-medium truncate">
                     {user.user_metadata?.full_name ?? "User"}
                   </p>
+                  {username && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      @{username}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground truncate">
                     {user.email}
                   </p>
