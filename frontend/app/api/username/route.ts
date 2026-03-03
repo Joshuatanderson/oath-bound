@@ -71,5 +71,13 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ username: data.username });
+  const res = NextResponse.json({ username: data.username });
+  res.cookies.set("ob_username", data.username, {
+    path: "/",
+    httpOnly: false,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+  return res;
 }

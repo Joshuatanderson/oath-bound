@@ -3,7 +3,7 @@ import { Geist, Geist_Mono, Noto_Sans } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
-const notoSans = Noto_Sans({variable:'--font-sans'});
+const notoSans = Noto_Sans({ variable: "--font-sans" });
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Oath Bound",
+  title: "Oathbound",
   description: "Skills attestation protocol",
 };
 
@@ -31,7 +31,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SiteHeader />
-        {children}
+        <div className="pt-14">{children}</div>
       </body>
     </html>
   );
