@@ -89,8 +89,19 @@ export function SiteHeader() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/login">Sign in</Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                supabase.auth.signInWithOAuth({
+                  provider: "google",
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                  },
+                })
+              }
+            >
+              Sign in
             </Button>
           )}
         </div>
