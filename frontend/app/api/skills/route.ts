@@ -100,6 +100,28 @@ export async function POST(request: Request) {
     );
   }
 
+  // On-chain attestation
+  const subject = `skill:${namespace}/${body.name}`;
+  const uri = `https://oathbound.ai/skills/${namespace}/${body.name}`;
+
+  let suiDigest: string | undefined;
+  let suiObjectId: string | undefined;
+
+  try {
+    const { createSkillAttestation } = await import("@/lib/sui");
+    const attestation = await createSkillAttestation(subject, tarHash, uri);
+    suiDigest = attestation.digest;
+    suiObjectId = attestation.objectId ?? undefined;
+  } catch (err) {
+    // Clean up uploaded file on Sui failure
+    await supabase.storage.from("skills").remove([storagePath]);
+    const message = err instanceof Error ? err.message : "Unknown Sui error";
+    return NextResponse.json(
+      { error: `On-chain attestation failed: ${message}` },
+      { status: 500 }
+    );
+  }
+
   // Insert skill record
   const license = body.license.toUpperCase() as LicenseType;
 
@@ -113,6 +135,8 @@ export async function POST(request: Request) {
     storage_path: storagePath,
     tar_hash: tarHash,
     user_id: userRecord.id,
+    sui_digest: suiDigest,
+    sui_object_id: suiObjectId,
   });
 
   if (insertError) {
@@ -124,5 +148,11 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ ok: true, namespace, name: body.name });
+  return NextResponse.json({
+    ok: true,
+    namespace,
+    name: body.name,
+    suiDigest,
+    suiObjectId,
+  });
 }

@@ -67,6 +67,8 @@ export type Database = {
           name: string
           namespace: string
           storage_path: string
+          sui_digest: string | null
+          sui_object_id: string | null
           tar_hash: string
           updated_at: string | null
           user_id: string
@@ -82,6 +84,8 @@ export type Database = {
           name: string
           namespace: string
           storage_path: string
+          sui_digest?: string | null
+          sui_object_id?: string | null
           tar_hash: string
           updated_at?: string | null
           user_id: string
@@ -97,6 +101,8 @@ export type Database = {
           name?: string
           namespace?: string
           storage_path?: string
+          sui_digest?: string | null
+          sui_object_id?: string | null
           tar_hash?: string
           updated_at?: string | null
           user_id?: string
