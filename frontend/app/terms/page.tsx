@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Terms of Service | Oath Bound",
+  title: "Terms of Service | Oathbound",
 };
 
 export default function TermsPage() {
@@ -14,15 +14,17 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold mb-2">1. Acceptance of Terms</h2>
           <p>
-            By accessing or using Oath Bound, you agree to be bound by these
+            By accessing or using Oathbound, you agree to be bound by these
             Terms of Service. If you do not agree, do not use the service.
           </p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-2">2. Description of Service</h2>
+          <h2 className="text-lg font-semibold mb-2">
+            2. Description of Service
+          </h2>
           <p>
-            Oath Bound is a skills attestation protocol that allows users to
+            Oathbound is a skills attestation protocol that allows users to
             upload, validate, and share skills. The service is provided
             &ldquo;as is&rdquo; and may change at any time.
           </p>
@@ -40,7 +42,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold mb-2">4. User Content</h2>
           <p>
-            You retain ownership of content you upload to Oath Bound. By
+            You retain ownership of content you upload to Oathbound. By
             uploading content, you grant us a license to store, display, and
             distribute that content as necessary to operate the service. You are
             solely responsible for ensuring your content does not violate any
@@ -58,9 +60,11 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-2">6. Limitation of Liability</h2>
+          <h2 className="text-lg font-semibold mb-2">
+            6. Limitation of Liability
+          </h2>
           <p>
-            To the fullest extent permitted by law, Oath Bound and its operators
+            To the fullest extent permitted by law, Oathbound and its operators
             shall not be liable for any indirect, incidental, special, or
             consequential damages arising from your use of the service.
           </p>

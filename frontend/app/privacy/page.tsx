@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Privacy Policy | Oath Bound",
+  title: "Privacy Policy | Oathbound",
 };
 
 export default function PrivacyPage() {
@@ -12,9 +12,11 @@ export default function PrivacyPage() {
 
       <div className="space-y-6 text-sm leading-relaxed">
         <section>
-          <h2 className="text-lg font-semibold mb-2">1. Information We Collect</h2>
+          <h2 className="text-lg font-semibold mb-2">
+            1. Information We Collect
+          </h2>
           <p>
-            When you use Oath Bound, we may collect information you provide
+            When you use Oathbound, we may collect information you provide
             directly, such as your name, email address, and any content you
             upload or submit. We also collect basic usage data such as pages
             visited and actions taken within the application.
@@ -22,11 +24,13 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-2">2. How We Use Your Information</h2>
+          <h2 className="text-lg font-semibold mb-2">
+            2. How We Use Your Information
+          </h2>
           <p>
-            We use the information we collect to operate and improve Oath Bound,
-            authenticate users, and communicate with you about the service. We do
-            not sell your personal information to third parties.
+            We use the information we collect to operate and improve Oathbound,
+            authenticate users, and communicate with you about the service. We
+            do not sell your personal information to third parties.
           </p>
         </section>
 
@@ -50,7 +54,9 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-2">5. Third-Party Services</h2>
+          <h2 className="text-lg font-semibold mb-2">
+            5. Third-Party Services
+          </h2>
           <p>
             We may use third-party services for authentication (e.g., Google
             Sign-In). These services have their own privacy policies governing
@@ -67,7 +73,9 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-2">7. Changes to This Policy</h2>
+          <h2 className="text-lg font-semibold mb-2">
+            7. Changes to This Policy
+          </h2>
           <p>
             We may update this privacy policy from time to time. We will notify
             you of any material changes by posting the updated policy on this
