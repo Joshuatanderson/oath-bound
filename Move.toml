@@ -1,5 +1,5 @@
 [package]
-name = "hello_world"
+name = "oathbound"
 version = "0.0.1"
 edition = "2024.beta"
 
@@ -7,4 +7,4 @@ edition = "2024.beta"
 Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
 
 [addresses]
-hello_world = "0x0"
+oathbound = "0x0"
