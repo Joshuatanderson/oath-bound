@@ -26,7 +26,7 @@ interface SkillRow {
 
 // --- Helpers ---
 function usage(): never {
-  console.log(`\n${DIM} oathbound pull <namespace/skill-name>${RESET}`);
+  console.log(`\n${DIM} oathbound install <namespace/skill-name>${RESET}`);
   process.exit(1);
 }
 
@@ -183,7 +183,9 @@ async function pull(skillArg: string): Promise<void> {
 const subcommand = process.argv[2];
 const skillArg = process.argv[3];
 
-if (subcommand !== 'pull' || !skillArg) {
+const PULL_ALIASES = new Set(['pull', 'i', 'install']);
+
+if (!subcommand || !PULL_ALIASES.has(subcommand) || !skillArg) {
   usage();
 }
 

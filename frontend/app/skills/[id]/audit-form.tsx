@@ -63,8 +63,18 @@ export function AuditForm({ skillId }: { skillId: string }) {
         <input
           ref={fileRef}
           type="file"
-          accept="application/pdf"
-          onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+          accept=".pdf"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file && file.type !== "application/pdf") {
+              setError("Only PDF files are accepted");
+              e.target.value = "";
+              setFileName(null);
+              return;
+            }
+            setError(null);
+            setFileName(file?.name ?? null);
+          }}
           className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
         />
       </div>

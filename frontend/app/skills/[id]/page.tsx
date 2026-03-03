@@ -36,7 +36,7 @@ export default async function SkillPage({
 
   const { data: audits } = await supabase
     .from("audits")
-    .select("id, ipfs_cid, passed, report_hash, audited_at, uploader")
+    .select("id, ipfs_cid, passed, report_hash, audited_at, uploader, sui_digest, sui_object_id")
     .eq("skill_id", id)
     .order("audited_at", { ascending: false });
 
@@ -79,7 +79,7 @@ export default async function SkillPage({
         </p>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-4xl font-bold tracking-tight">{skill.name}</h1>
-          <CopyCommand command={`oathbound ${skill.namespace}/${skill.name}`} />
+          <CopyCommand command={`oathbound pull ${skill.namespace}/${skill.name}`} />
         </div>
         <p className="text-lg text-muted-foreground">{skill.description}</p>
       </div>
@@ -175,6 +175,38 @@ export default async function SkillPage({
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   </CardDescription>
+                  {(audit.sui_digest || audit.sui_object_id) && (
+                    <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
+                      {audit.sui_digest && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Tx:</span>
+                          <a
+                            href={`https://suiscan.xyz/testnet/tx/${audit.sui_digest}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 truncate text-xs font-mono text-primary hover:underline"
+                          >
+                            {audit.sui_digest}
+                            <ExternalLink className="h-3 w-3 shrink-0" />
+                          </a>
+                        </div>
+                      )}
+                      {audit.sui_object_id && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Object:</span>
+                          <a
+                            href={`https://suiscan.xyz/testnet/object/${audit.sui_object_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 truncate text-xs font-mono text-primary hover:underline"
+                          >
+                            {audit.sui_object_id}
+                            <ExternalLink className="h-3 w-3 shrink-0" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardHeader>
               </Card>
             ))}
