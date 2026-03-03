@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const { data: userRecord, error: userError } = await supabase
     .from("users")
-    .select("id")
+    .select("id, role")
     .eq("user_id", user.id)
     .single();
 
@@ -29,6 +29,13 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "User profile not found. Please set up your username first." },
       { status: 400 }
+    );
+  }
+
+  if (userRecord.role !== "AUDITOR") {
+    return NextResponse.json(
+      { error: "Only auditors can submit audits." },
+      { status: 403 }
     );
   }
 

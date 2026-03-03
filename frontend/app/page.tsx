@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { User } from "@supabase/supabase-js";
 import {
   Select,
@@ -340,44 +339,11 @@ export default function Home() {
   // ------ Render ------
 
   return (
-    <div className="flex min-h-screen items-start justify-center bg-background font-sans">
-      <main className="flex w-full max-w-2xl flex-col gap-16 px-6 py-20">
-        {/* Header */}
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-4xl font-bold tracking-tight">Oath Bound</h1>
-            {user ? (
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={async () => {
-                    await supabase.auth.signOut();
-                    setUser(null);
-                  }}
-                >
-                  Sign out
-                </Button>
-                <Avatar className="h-8 w-8">
-                  <AvatarImage
-                    src={user.user_metadata?.avatar_url}
-                    alt={user.user_metadata?.full_name ?? "User"}
-                  />
-                  <AvatarFallback>
-                    {user.email?.charAt(0).toUpperCase() ?? "?"}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-            ) : (
-              <Button variant="outline" size="sm" asChild>
-                <a href="/login">Sign in</a>
-              </Button>
-            )}
-          </div>
-          <p className="text-lg text-muted-foreground">
-            Attest your skills on-chain. Build trust through verifiable claims.
-          </p>
-        </div>
+    <main className="mx-auto flex w-full max-w-2xl flex-col gap-16 px-6 py-10">
+        {/* Intro */}
+        <p className="text-lg text-muted-foreground">
+          Attest your skills on-chain. Build trust through verifiable claims.
+        </p>
 
         {/* Loading state */}
         {(authLoading || usernameLoading) && (
@@ -731,7 +697,6 @@ export default function Home() {
             </Button>
           </div>
         )}
-      </main>
-    </div>
+    </main>
   );
 }

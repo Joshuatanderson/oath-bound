@@ -7,6 +7,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { AuditForm } from "./audit-form";
+import { CopyCommand } from "./copy-command";
 
 export default async function SkillPage({
   params,
@@ -38,15 +39,15 @@ export default async function SkillPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Check if the current user has a profile (needed to show audit form)
-  let hasProfile = false;
+  // Only auditors can submit audits
+  let isAuditor = false;
   if (user) {
     const { data: userRecord } = await supabase
       .from("users")
-      .select("id")
+      .select("id, role")
       .eq("user_id", user.id)
       .single();
-    hasProfile = !!userRecord;
+    isAuditor = userRecord?.role === "AUDITOR";
   }
 
   return (
@@ -55,7 +56,10 @@ export default async function SkillPage({
         <p className="text-sm text-muted-foreground">
           {skill.namespace}/{skill.name} v{skill.version}
         </p>
-        <h1 className="text-4xl font-bold tracking-tight">{skill.name}</h1>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-4xl font-bold tracking-tight">{skill.name}</h1>
+          <CopyCommand command={`oathbound ${skill.namespace}/${skill.name}`} />
+        </div>
         <p className="text-lg text-muted-foreground">{skill.description}</p>
       </div>
 
@@ -108,7 +112,7 @@ export default async function SkillPage({
         )}
       </section>
 
-      {user && hasProfile && (
+      {isAuditor && (
         <section className="flex flex-col gap-4">
           <h2 className="text-2xl font-semibold tracking-tight">
             Add an Audit
