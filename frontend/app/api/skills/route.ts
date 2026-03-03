@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerClient } from "@/lib/supabase.server";
 import { createTarBuffer, hashTar } from "@/lib/tar";
 import { parseFrontmatter, serializeFrontmatter } from "@/lib/skill-validator";
+import { waitForChainWrite, registerSkill } from "@/lib/sui";
 import type { SkillFile } from "@/lib/skill-validator";
 import type { Database } from "@/lib/database.types";
 
@@ -108,8 +109,9 @@ export async function POST(request: Request) {
   let suiObjectId: string | undefined;
 
   try {
-    const { registerSkill } = await import("@/lib/sui");
-    const attestation = await registerSkill(subject, tarHash, uri);
+    const attestation = await waitForChainWrite(() =>
+      registerSkill(subject, tarHash, uri)
+    );
     suiDigest = attestation.digest;
     suiObjectId = attestation.objectId ?? undefined;
   } catch (err) {

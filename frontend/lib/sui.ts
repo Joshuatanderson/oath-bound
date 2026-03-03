@@ -60,6 +60,17 @@ async function executeAttestation(tx: Transaction): Promise<AttestationResult> {
   return { digest: result.digest, objectId };
 }
 
+// --- Chain write wrapper ---
+
+/** Await a chain write and confirm finality before returning. */
+export async function waitForChainWrite(
+  chainFn: () => Promise<AttestationResult>
+): Promise<AttestationResult> {
+  const result = await chainFn();
+  await client.waitForTransaction({ digest: result.digest });
+  return result;
+}
+
 // --- Exported attestation functions ---
 
 export async function registerSkill(
