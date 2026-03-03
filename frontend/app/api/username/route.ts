@@ -41,6 +41,8 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const username = validateUsername(body.username ?? "");
+  const displayName =
+    typeof body.displayName === "string" ? body.displayName.trim().slice(0, 100) || null : null;
 
   if (!username) {
     return NextResponse.json(
@@ -54,7 +56,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from("users")
-    .insert({ user_id: user.id, username })
+    .insert({ user_id: user.id, username, display_name: displayName })
     .select("username")
     .single();
 

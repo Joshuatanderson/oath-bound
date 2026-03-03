@@ -20,6 +20,7 @@ export default function SetupPage() {
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [claiming, setClaiming] = useState(false);
+  const [displayName, setDisplayName] = useState("");
 
   // On mount: if not signed in, go to /login. If already has username, go to /.
   useEffect(() => {
@@ -76,7 +77,10 @@ export default function SetupPage() {
       const res = await fetch("/api/username", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: trimmed }),
+        body: JSON.stringify({
+          username: trimmed,
+          displayName: displayName.trim() || null,
+        }),
       });
       const data = await res.json();
 
@@ -157,6 +161,20 @@ export default function SetupPage() {
         )}
         <p className="text-xs text-muted-foreground">
           Lowercase letters, numbers, and hyphens. 3-64 characters.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="display-name">Display name (optional)</Label>
+        <Input
+          id="display-name"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          placeholder="Jane Doe"
+          maxLength={100}
+        />
+        <p className="text-xs text-muted-foreground">
+          Shown alongside your username. You can change this later.
         </p>
       </div>
 
