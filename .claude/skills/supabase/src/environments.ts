@@ -11,10 +11,10 @@ export interface EnvironmentConfig {
 }
 
 export const ENVIRONMENT: EnvironmentConfig = Object.freeze({
-  projectRef: 'mjnfqagwuewhgwbtrdgs',
+  projectRef: "mjnfqagwuewhgwbtrdgs",
   allowWrite: true,
   allowDestructive: true,
-  name: 'Oath Bound',
+  name: "Oathbound",
 });
 
 export function getCurrentEnvironment(): EnvironmentConfig {

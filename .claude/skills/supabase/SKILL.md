@@ -1,6 +1,6 @@
 # Supabase Skill
 
-**Project:** `mjnfqagwuewhgwbtrdgs` (Oath Bound)
+**Project:** `mjnfqagwuewhgwbtrdgs` (Oathbound)
 
 ## Execute
 

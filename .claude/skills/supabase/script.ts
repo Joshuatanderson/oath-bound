@@ -52,7 +52,7 @@ function getDbUrl(projectRef: string): string {
   }
   // Use port 5432 (direct connection), NOT 6543 (pooler) — pooler causes
   // "prepared statement already exists" errors with supabase db push.
-  return `postgresql://postgres.${projectRef}:${password}@aws-1-us-east-2.pooler.supabase.com:5432/postgres`;
+  return `postgresql://postgres.${projectRef}:${encodeURIComponent(password)}@aws-1-us-east-2.pooler.supabase.com:5432/postgres`;
 }
 
 function findFrontendDir(): string {
