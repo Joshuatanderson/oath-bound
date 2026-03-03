@@ -11,11 +11,10 @@
 - Querying tables or data
 - Listing tables, migrations, extensions
 - Running SQL queries
-- Generating TypeScript types
+- Pushing migrations to the remote database
 - Searching Supabase documentation
 - Checking project logs
 - Getting security/performance advisors
-- Managing edge functions (deploy, list, invoke)
 
 ## If This Skill Blocks an Operation
 
@@ -29,19 +28,21 @@
 | Instead of... | Use this skill's... |
 |---------------|---------------------|
 | `mcp__supabase__execute_sql` | `executeRawSql()` |
-| `mcp__supabase__apply_migration` | `applyMigration()` |
+| `mcp__supabase__apply_migration` | `push-migrations` action |
 | `mcp__supabase__list_tables` | `listTables()` |
 | `mcp__supabase__*` (any) | Corresponding tool in `servers/supabase/` |
+| `supabase db push` directly | `--action=push-migrations` |
 | Supabase CLI directly | This skill's TypeScript tools |
 
 ## Environment Variables
 
-**CRITICAL**: This skill requires environment variables from the **project root** `.env` or `frontend/.env.local` file.
+**CRITICAL**: This skill requires environment variables from the **project root** `.env` file.
 
 ### Required Variables
 
-- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` - Supabase anon/public key
+- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL (in `frontend/.env.local`)
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY` - Supabase anon key (in `frontend/.env.local`)
+- `SUPABASE_DB_PASSWORD` - Database password (in project root `.env`)
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (for admin operations)
 - `SUPABASE_ACCOUNT_TOKEN` - Supabase Management API token (for raw SQL execution)
 
@@ -57,25 +58,34 @@ bun .claude/skills/supabase/script.ts --action=list-tables
 cd .claude/skills/supabase && bun script.ts
 ```
 
+## Migrations
+
+**Use `push-migrations` to apply migrations.** This uses `supabase db push` which:
+- Reads migration files from `frontend/supabase/migrations/`
+- Compares against what's already applied on remote
+- Applies only new ones
+- Records them in the migration history table
+
+**Port 5432 only.** The direct connection (port 5432) must be used, not the pooler (port 6543), which causes "prepared statement already exists" errors.
+
+```bash
+# Push all pending migrations
+bun .claude/skills/supabase/script.ts --action=push-migrations
+```
+
 ## Quick Reference
 
 ### Common Operations
 
-```typescript
-// List all tables
-import { listTables } from './servers/supabase/database/listTables.ts';
-const tables = await listTables();
+```bash
+# Push migrations
+bun .claude/skills/supabase/script.ts --action=push-migrations
 
-// Execute a query
-import { executeRawSql, assertAllowed, analyzeQueryRisk } from './src/index.ts';
+# Query the database
+bun .claude/skills/supabase/script.ts --action=query --sql="SELECT * FROM users LIMIT 5"
 
-const query = `SELECT * FROM users LIMIT 10`;
-assertAllowed('database', analyzeQueryRisk(query));
-const result = await executeRawSql(query);
-
-// Search documentation
-import { searchDocs } from './servers/supabase/docs/searchDocs.ts';
-const docs = await searchDocs({ query: 'authentication' });
+# List all tables
+bun .claude/skills/supabase/script.ts --action=list-tables
 ```
 
 ### Available Tool Categories
@@ -86,35 +96,3 @@ See `servers/supabase/` for implementations:
 - `logs/` - Project logs
 - `config/` - URLs, keys
 - `advisors/` - Security/performance checks
-- `edge-functions/` - Function deployment, listing, and invocation
-
-## CLI Actions Reference
-
-### Database Actions
-
-```bash
-# Query the database
-bun .claude/skills/supabase/script.ts --action=query --sql="SELECT * FROM users LIMIT 5"
-
-# List all tables
-bun .claude/skills/supabase/script.ts --action=list-tables
-
-# Apply a migration
-bun .claude/skills/supabase/script.ts --action=apply-migration --file=supabase/migrations/20250120_my_migration.sql
-```
-
-### Edge Function Actions
-
-```bash
-# List all edge functions
-bun .claude/skills/supabase/script.ts --action=list-functions
-
-# Deploy an edge function
-bun .claude/skills/supabase/script.ts --action=deploy-function --name=my-function
-
-# Deploy with JWT verification enabled
-bun .claude/skills/supabase/script.ts --action=deploy-function --name=my-function --verify-jwt
-
-# Invoke an edge function
-bun .claude/skills/supabase/script.ts --action=invoke-function --name=my-function --body='{"key":"value"}'
-```

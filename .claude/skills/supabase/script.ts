@@ -5,40 +5,28 @@
  * Usage:
  *   bun .claude/skills/supabase/script.ts --action=query --sql="SELECT * FROM users LIMIT 5"
  *   bun .claude/skills/supabase/script.ts --action=list-tables
- *   bun .claude/skills/supabase/script.ts --action=apply-migration --file=path/to/migration.sql
- *   bun .claude/skills/supabase/script.ts --action=deploy-function --name=my-function
- *   bun .claude/skills/supabase/script.ts --action=list-functions
- *   bun .claude/skills/supabase/script.ts --action=invoke-function --name=my-function --body='{"key":"value"}'
+ *   bun .claude/skills/supabase/script.ts --action=push-migrations
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { getCurrentEnvironment } from './src/index.ts';
-import { applyMigration } from './servers/supabase/database/applyMigration.ts';
 import { executeRawSql } from './src/client.ts';
 import { listTables } from './servers/supabase/database/listTables.ts';
 import { assertAllowed, analyzeQueryRisk } from './src/permissions.ts';
-import { deployEdgeFunction } from './servers/supabase/edge-functions/deployEdgeFunction.ts';
-import { listEdgeFunctions } from './servers/supabase/edge-functions/listEdgeFunctions.ts';
-import { invokeEdgeFunction } from './servers/supabase/edge-functions/invokeEdgeFunction.ts';
-import type { EdgeFunctionFile } from './src/types.ts';
 
-type Action = 'apply-migration' | 'query' | 'list-tables' | 'deploy-function' | 'list-functions' | 'invoke-function';
+type Action = 'push-migrations' | 'query' | 'list-tables';
 
 interface CLIArgs {
   action?: Action;
-  file?: string;
   sql?: string;
-  name?: string;
-  body?: string;
-  verifyJwt?: boolean;
 }
 
 function parseArgs(): CLIArgs {
   const args = process.argv.slice(2);
   const result: CLIArgs = {};
 
-  const validActions = ['apply-migration', 'query', 'list-tables', 'deploy-function', 'list-functions', 'invoke-function'];
+  const validActions: Action[] = ['push-migrations', 'query', 'list-tables'];
 
   for (const arg of args) {
     if (arg.startsWith('--action=')) {
@@ -49,28 +37,44 @@ function parseArgs(): CLIArgs {
         console.error(`Error: Invalid action '${actionValue}'. Must be one of: ${validActions.join(', ')}`);
         process.exit(1);
       }
-    } else if (arg.startsWith('--file=')) {
-      result.file = arg.split('=').slice(1).join('=');
     } else if (arg.startsWith('--sql=')) {
       result.sql = arg.split('=').slice(1).join('=');
-    } else if (arg.startsWith('--name=')) {
-      result.name = arg.split('=').slice(1).join('=');
-    } else if (arg.startsWith('--body=')) {
-      result.body = arg.split('=').slice(1).join('=');
-    } else if (arg === '--verify-jwt') {
-      result.verifyJwt = true;
-    } else if (arg === '--no-verify-jwt') {
-      result.verifyJwt = false;
     }
   }
 
   return result;
 }
 
-function extractMigrationName(filePath: string): string {
-  const basename = path.basename(filePath, '.sql');
-  const withoutTimestamp = basename.replace(/^\d{8}_/, '');
-  return withoutTimestamp;
+function getDbUrl(projectRef: string): string {
+  const password = process.env.SUPABASE_DB_PASSWORD;
+  if (!password) {
+    throw new Error('SUPABASE_DB_PASSWORD not found. Set it in the project root .env file.');
+  }
+  // Use port 5432 (direct connection), NOT 6543 (pooler) — pooler causes
+  // "prepared statement already exists" errors with supabase db push.
+  return `postgresql://postgres.${projectRef}:${password}@aws-1-us-east-2.pooler.supabase.com:5432/postgres`;
+}
+
+function findFrontendDir(): string {
+  const dir = process.cwd();
+  if (fs.existsSync(path.join(dir, 'supabase', 'migrations'))) {
+    return dir;
+  }
+  const frontendDir = path.join(dir, 'frontend');
+  if (fs.existsSync(path.join(frontendDir, 'supabase', 'migrations'))) {
+    return frontendDir;
+  }
+  throw new Error('Could not find supabase/migrations directory. Run from project root or frontend/.');
+}
+
+async function execCommand(command: string, cwd: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  const proc = Bun.spawn(['sh', '-c', command], { cwd, stdout: 'pipe', stderr: 'pipe' });
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  const exitCode = await proc.exited;
+  return { stdout, stderr, exitCode };
 }
 
 async function main(): Promise<void> {
@@ -89,33 +93,27 @@ async function main(): Promise<void> {
 
   try {
     switch (args.action) {
-      case 'apply-migration': {
-        if (!args.file) {
-          console.error('Error: --file is required for apply-migration action');
-          process.exit(1);
+      case 'push-migrations': {
+        assertAllowed('database', 'write');
+
+        const frontendDir = findFrontendDir();
+        const dbUrl = getDbUrl(config.projectRef);
+
+        console.log(`[Migration] Pushing from: ${frontendDir}/supabase/migrations/`);
+
+        const result = await execCommand(
+          `bunx supabase db push --include-all --db-url "${dbUrl}"`,
+          frontendDir,
+        );
+
+        if (result.stdout) console.log(result.stdout);
+        if (result.stderr) console.error(result.stderr);
+
+        if (result.exitCode !== 0) {
+          throw new Error(`supabase db push failed with exit code ${result.exitCode}`);
         }
 
-        const filePath = path.resolve(args.file);
-        if (!fs.existsSync(filePath)) {
-          console.error(`Error: Migration file not found: ${filePath}`);
-          process.exit(1);
-        }
-
-        const query = fs.readFileSync(filePath, 'utf-8');
-        const migrationName = extractMigrationName(filePath);
-
-        console.log(`[Migration] Name: ${migrationName}`);
-        console.log(`[Migration] File: ${filePath}`);
-        console.log(`[Migration] SQL Preview:\n${query.slice(0, 500)}${query.length > 500 ? '...' : ''}\n`);
-
-        const riskLevel = analyzeQueryRisk(query);
-        console.log(`[Migration] Risk level: ${riskLevel}`);
-        assertAllowed('database', riskLevel);
-
-        const result = await applyMigration({ name: migrationName, query });
-        console.log(`\n✅ Migration applied successfully!`);
-        console.log(`   Version: ${result.version}`);
-        console.log(`   Name: ${result.name}`);
+        console.log('\n✅ Migrations pushed successfully!');
         break;
       }
 
@@ -140,117 +138,6 @@ async function main(): Promise<void> {
         const tables = await listTables();
         console.log('\nTables:');
         console.log(JSON.stringify(tables, null, 2));
-        break;
-      }
-
-      case 'deploy-function': {
-        if (!args.name) {
-          console.error('Error: --name is required for deploy-function action');
-          process.exit(1);
-        }
-
-        const functionsDir = path.resolve(process.cwd(), 'supabase', 'functions', args.name);
-        if (!fs.existsSync(functionsDir)) {
-          console.error(`Error: Function directory not found: ${functionsDir}`);
-          process.exit(1);
-        }
-
-        console.log(`[Deploy] Function: ${args.name}`);
-        console.log(`[Deploy] Directory: ${functionsDir}`);
-        console.log(`[Deploy] Verify JWT: ${args.verifyJwt ?? false}`);
-
-        const files: EdgeFunctionFile[] = [];
-        const readFilesRecursively = (dir: string, basePath: string = '') => {
-          const entries = fs.readdirSync(dir, { withFileTypes: true });
-          for (const entry of entries) {
-            const fullPath = path.join(dir, entry.name);
-            const relativePath = basePath ? `${basePath}/${entry.name}` : entry.name;
-
-            if (entry.isDirectory()) {
-              if (!['node_modules', '.git', 'dist'].includes(entry.name)) {
-                readFilesRecursively(fullPath, relativePath);
-              }
-            } else if (entry.isFile()) {
-              if (/\.(ts|js|json)$/.test(entry.name)) {
-                const content = fs.readFileSync(fullPath, 'utf-8');
-                files.push({ name: relativePath, content });
-                console.log(`[Deploy] Including file: ${relativePath} (${content.length} bytes)`);
-              }
-            }
-          }
-        };
-
-        readFilesRecursively(functionsDir);
-
-        if (files.length === 0) {
-          console.error('Error: No .ts, .js, or .json files found in function directory');
-          process.exit(1);
-        }
-
-        console.log(`\n[Deploy] Deploying ${files.length} file(s)...`);
-
-        const result = await deployEdgeFunction({
-          name: args.name,
-          files,
-          verifyJwt: args.verifyJwt ?? false,
-        });
-
-        console.log(`\n✅ Function deployed successfully!`);
-        console.log(`   Name: ${result.name}`);
-        console.log(`   Slug: ${result.slug}`);
-        console.log(`   Version: ${result.version}`);
-        console.log(`   Status: ${result.status}`);
-        break;
-      }
-
-      case 'list-functions': {
-        const functions = await listEdgeFunctions();
-        console.log('\nEdge Functions:');
-        console.log(JSON.stringify(functions, null, 2));
-        break;
-      }
-
-      case 'invoke-function': {
-        if (!args.name) {
-          console.error('Error: --name is required for invoke-function action');
-          process.exit(1);
-        }
-
-        let body: Record<string, unknown> | undefined;
-        if (args.body) {
-          try {
-            body = JSON.parse(args.body);
-          } catch {
-            console.error('Error: --body must be valid JSON');
-            console.error(`Received: ${args.body}`);
-            process.exit(1);
-          }
-        }
-
-        console.log(`[Invoke] Function: ${args.name}`);
-        if (body) {
-          console.log(`[Invoke] Body: ${JSON.stringify(body, null, 2)}`);
-        }
-        console.log('');
-
-        const result = await invokeEdgeFunction({
-          name: args.name,
-          body,
-        });
-
-        if (result.ok) {
-          console.log(`✅ Function invoked successfully!`);
-        } else {
-          console.log(`⚠️  Function returned non-OK status`);
-        }
-        console.log(`   Status: ${result.status} ${result.statusText}`);
-        console.log(`   Duration: ${result.duration}ms`);
-        console.log('\nResponse:');
-        if (typeof result.data === 'object') {
-          console.log(JSON.stringify(result.data, null, 2));
-        } else {
-          console.log(result.data);
-        }
         break;
       }
 

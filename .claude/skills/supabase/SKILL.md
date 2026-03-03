@@ -7,25 +7,27 @@
 ```bash
 # Run from project root (required for env vars)
 
+# Push all pending migrations to remote database
+bun .claude/skills/supabase/script.ts --action=push-migrations
+
 # Query the database
 bun .claude/skills/supabase/script.ts --action=query --sql="SELECT * FROM users LIMIT 5"
 
 # List tables
 bun .claude/skills/supabase/script.ts --action=list-tables
-
-# Apply a migration
-bun .claude/skills/supabase/script.ts --action=apply-migration --file=path/to/migration.sql
-
-# Deploy edge function
-bun .claude/skills/supabase/script.ts --action=deploy-function --name=my-function
-bun .claude/skills/supabase/script.ts --action=deploy-function --name=my-function --verify-jwt
-
-# List edge functions
-bun .claude/skills/supabase/script.ts --action=list-functions
-
-# Invoke edge function
-bun .claude/skills/supabase/script.ts --action=invoke-function --name=my-function --body='{"key":"value"}'
 ```
+
+## Migrations Workflow
+
+1. Create a migration file in `frontend/supabase/migrations/` with timestamp prefix (e.g. `20260303010133_add_role_to_users.sql`)
+2. Run `push-migrations` to apply all pending migrations
+3. Regenerate types: `bunx supabase gen types --lang=typescript --project-id mjnfqagwuewhgwbtrdgs > frontend/lib/database.types.ts`
+
+**Important:** `push-migrations` uses `supabase db push` with a direct DB connection (port 5432). Do NOT use port 6543 (pooler) — it causes "prepared statement already exists" errors.
+
+## Environment Variables
+
+Requires `SUPABASE_DB_PASSWORD` in the project root `.env` file (one directory above `frontend/`).
 
 ## Permissions
 
@@ -43,17 +45,6 @@ import {
 } from './src/index.ts';
 ```
 
-## Example: Query
-
-```typescript
-import { executeRawSql, assertAllowed, analyzeQueryRisk } from './src/index.ts';
-
-const query = `SELECT * FROM users LIMIT 10`;
-assertAllowed('database', analyzeQueryRisk(query));
-const result = await executeRawSql(query);
-console.log(JSON.stringify(result, null, 2));
-```
-
 ## Available Tools
 
 See `servers/supabase/` for tool implementations by category:
@@ -62,4 +53,3 @@ See `servers/supabase/` for tool implementations by category:
 - `logs/` - project logs
 - `config/` - URLs, keys
 - `advisors/` - security/performance checks
-- `edge-functions/` - function deployment, listing, invocation

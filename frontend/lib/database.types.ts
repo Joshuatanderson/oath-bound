@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      audits: {
+        Row: {
+          audited_at: string
+          auditor_name: string
+          id: string
+          report_path: string | null
+          skill_id: string
+          uploader: string
+        }
+        Insert: {
+          audited_at?: string
+          auditor_name: string
+          id?: string
+          report_path?: string | null
+          skill_id: string
+          uploader: string
+        }
+        Update: {
+          audited_at?: string
+          auditor_name?: string
+          id?: string
+          report_path?: string | null
+          skill_id?: string
+          uploader?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audits_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audits_uploader_fkey"
+            columns: ["uploader"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       skills: {
         Row: {
           allowed_tools: string | null
@@ -75,6 +117,7 @@ export type Database = {
           created_at: string | null
           display_name: string | null
           id: string
+          role: string
           user_id: string
           username: string
         }
@@ -82,6 +125,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string
+          role?: string
           user_id: string
           username: string
         }
@@ -89,6 +133,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string
+          role?: string
           user_id?: string
           username?: string
         }
