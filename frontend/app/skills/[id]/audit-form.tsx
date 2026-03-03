@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function AuditForm({ skillId }: { skillId: string }) {
-  const [auditorName, setAuditorName] = useState("");
-  const [reportPath, setReportPath] = useState("");
+  const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [passed, setPassed] = useState<boolean | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -16,16 +18,27 @@ export function AuditForm({ skillId }: { skillId: string }) {
     e.preventDefault();
     setError(null);
     setSuccess(false);
+
+    const file = fileRef.current?.files?.[0];
+    if (!file) {
+      setError("Please select a PDF file");
+      return;
+    }
+    if (passed === null) {
+      setError("Please select a pass or fail verdict");
+      return;
+    }
+
     setSubmitting(true);
+
+    const formData = new FormData();
+    formData.append("skill_id", skillId);
+    formData.append("passed", String(passed));
+    formData.append("file", file);
 
     const res = await fetch("/api/audits", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        skill_id: skillId,
-        auditor_name: auditorName,
-        report_path: reportPath || undefined,
-      }),
+      body: formData,
     });
 
     const data = await res.json();
@@ -37,40 +50,56 @@ export function AuditForm({ skillId }: { skillId: string }) {
     }
 
     setSuccess(true);
-    setAuditorName("");
-    setReportPath("");
+    setPassed(null);
+    setFileName(null);
+    if (fileRef.current) fileRef.current.value = "";
+    router.refresh();
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
-        <Label htmlFor="auditorName">Auditor name</Label>
-        <Input
-          id="auditorName"
-          value={auditorName}
-          onChange={(e) => setAuditorName(e.target.value)}
-          placeholder="e.g. your name or org"
-          required
+        <Label>Audit report (PDF)</Label>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/pdf"
+          onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+          className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
         />
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="reportPath">Report URL (optional)</Label>
-        <Input
-          id="reportPath"
-          value={reportPath}
-          onChange={(e) => setReportPath(e.target.value)}
-          placeholder="https://..."
-        />
+        <Label>Verdict</Label>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={passed === true ? "default" : "outline"}
+            onClick={() => setPassed(true)}
+          >
+            Pass
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={passed === false ? "destructive" : "outline"}
+            onClick={() => setPassed(false)}
+          >
+            Fail
+          </Button>
+        </div>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
       {success && (
-        <p className="text-sm text-green-600">Audit submitted successfully.</p>
+        <p className="text-sm text-green-600">
+          Audit submitted and pinned to IPFS.
+        </p>
       )}
 
-      <Button type="submit" disabled={submitting}>
-        {submitting ? "Submitting..." : "Submit Audit"}
+      <Button type="submit" disabled={submitting || !fileName || passed === null}>
+        {submitting ? "Uploading..." : "Submit Audit"}
       </Button>
     </form>
   );

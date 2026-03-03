@@ -19,6 +19,7 @@ export type Database = {
           audited_at: string
           id: string
           ipfs_cid: string
+          passed: boolean
           report_hash: string
           skill_id: string
           uploader: string
@@ -27,6 +28,7 @@ export type Database = {
           audited_at?: string
           id?: string
           ipfs_cid: string
+          passed: boolean
           report_hash: string
           skill_id: string
           uploader: string
@@ -35,6 +37,7 @@ export type Database = {
           audited_at?: string
           id?: string
           ipfs_cid?: string
+          passed?: boolean
           report_hash?: string
           skill_id?: string
           uploader?: string

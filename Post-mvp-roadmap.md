@@ -5,6 +5,7 @@
   - Tie together skills of multiple versions. 
   - Hide old versions by default.
 
-- cli
+- cli - publish to npm
+- persona
 - fetch skill
 - push skill

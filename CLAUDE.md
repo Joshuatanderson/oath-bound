@@ -11,6 +11,11 @@ Less is more. Complexity breeds bugs. State should only be used when necessary, 
 # Database
 Whenever you will have to read or write to the database, NEVER assume you know structure. always look at our frontend/lib/database.types.ts file first, and read the relevant types
 
+## Supabase CLI
+- All migrations live in `frontend/supabase/migrations/` — always run `supabase` commands from `frontend/`, not the repo root.
+- Use port **5432** (direct connection) for `supabase db push`. Port 6543 (transaction pooler) does not support prepared statements and will fail.
+- If `supabase link` didn't capture the DB password, pass `--db-url` explicitly.
+
 ## Design
 - always use shadcn and lucide as a base. Consult the user before pulling in any other packages. 
 - Always design mobile first. Design for the smallest screen size first, then scale up.

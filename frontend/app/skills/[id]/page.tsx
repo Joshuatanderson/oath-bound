@@ -10,6 +10,9 @@ import { ExternalLink } from "lucide-react";
 import { AuditForm } from "./audit-form";
 import { CopyCommand } from "./copy-command";
 
+const IPFS_GATEWAY =
+  process.env.NEXT_PUBLIC_PINATA_GATEWAY ?? "https://gateway.pinata.cloud";
+
 export default async function SkillPage({
   params,
 }: {
@@ -32,9 +35,25 @@ export default async function SkillPage({
 
   const { data: audits } = await supabase
     .from("audits")
-    .select("id, auditor_name, report_path, audited_at")
+    .select("id, ipfs_cid, passed, report_hash, audited_at, uploader")
     .eq("skill_id", id)
     .order("audited_at", { ascending: false });
+
+  // Look up uploader usernames
+  const uploaderIds = [...new Set(audits?.map((a) => a.uploader) ?? [])];
+  const { data: uploaderUsers } = uploaderIds.length
+    ? await supabase
+        .from("users")
+        .select("user_id, username, display_name")
+        .in("user_id", uploaderIds)
+    : { data: [] };
+
+  const uploaderMap = new Map(
+    (uploaderUsers ?? []).map((u) => [
+      u.user_id,
+      u.display_name || u.username,
+    ])
+  );
 
   const {
     data: { user },
@@ -123,24 +142,33 @@ export default async function SkillPage({
             {audits.map((audit) => (
               <Card key={audit.id}>
                 <CardHeader>
-                  <CardTitle className="text-base">
-                    {audit.auditor_name}
-                  </CardTitle>
-                  <CardDescription>
-                    {new Date(audit.audited_at).toLocaleDateString()}
-                    {audit.report_path && (
-                      <>
-                        {" — "}
-                        <a
-                          href={audit.report_path}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline"
-                        >
-                          Report
-                        </a>
-                      </>
-                    )}
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">
+                      {uploaderMap.get(audit.uploader) ?? "Unknown"}
+                    </CardTitle>
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        audit.passed
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                      }`}
+                    >
+                      {audit.passed ? "Pass" : "Fail"}
+                    </span>
+                  </div>
+                  <CardDescription className="flex items-center gap-2">
+                    <span>
+                      {new Date(audit.audited_at).toLocaleDateString()}
+                    </span>
+                    <a
+                      href={`${IPFS_GATEWAY}/ipfs/${audit.ipfs_cid}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                    >
+                      View report
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
                   </CardDescription>
                 </CardHeader>
               </Card>

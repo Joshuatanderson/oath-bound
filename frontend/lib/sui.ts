@@ -25,7 +25,7 @@ export interface AttestationResult {
 
 // --- Internal helpers ---
 
-/** Convert hex string (from hashTar) to byte array for tx.pure.vector("u8", ...) */
+/** Convert hex string to byte array for tx.pure.vector("u8", ...) */
 function hexToBytes(hex: string): number[] {
   const bytes: number[] = [];
   for (let i = 0; i < hex.length; i += 2) {
@@ -34,8 +34,8 @@ function hexToBytes(hex: string): number[] {
   return bytes;
 }
 
-/** SHA-256 hash a string to 32 bytes (contract asserts subject.length() == 32) */
-function sha256(input: string): number[] {
+/** SHA-256 hash a string to 32 bytes */
+export function sha256(input: string): number[] {
   const hash = createHash("sha256").update(input).digest();
   return Array.from(hash);
 }
@@ -62,14 +62,14 @@ async function executeAttestation(tx: Transaction): Promise<AttestationResult> {
 
 // --- Exported attestation functions ---
 
-export async function createSkillAttestation(
+export async function registerSkill(
   subject: string,
   skillHash: string,
   uri: string
 ): Promise<AttestationResult> {
   const tx = new Transaction();
   tx.moveCall({
-    target: `${PACKAGE_ID}::attestation::create_skill`,
+    target: `${PACKAGE_ID}::registrations::register_skill`,
     arguments: [
       tx.object(ADMIN_CAP_ID),
       tx.pure.vector("u8", sha256(subject)),
@@ -80,33 +80,33 @@ export async function createSkillAttestation(
   return executeAttestation(tx);
 }
 
-export async function createAuditAttestation(
-  skillObjectId: string,
+export async function registerAudit(
   subject: string,
   skillHash: string,
+  reportHash: string,
   uri: string
 ): Promise<AttestationResult> {
   const tx = new Transaction();
   tx.moveCall({
-    target: `${PACKAGE_ID}::attestation::create_audit`,
+    target: `${PACKAGE_ID}::registrations::register_audit`,
     arguments: [
       tx.object(ADMIN_CAP_ID),
-      tx.object(skillObjectId),
       tx.pure.vector("u8", sha256(subject)),
       tx.pure.vector("u8", hexToBytes(skillHash)),
+      tx.pure.vector("u8", hexToBytes(reportHash)),
       tx.pure.string(uri),
     ],
   });
   return executeAttestation(tx);
 }
 
-export async function createAuthorAttestation(
+export async function registerAuthor(
   subject: string,
   uri: string
 ): Promise<AttestationResult> {
   const tx = new Transaction();
   tx.moveCall({
-    target: `${PACKAGE_ID}::attestation::create_author`,
+    target: `${PACKAGE_ID}::registrations::register_author`,
     arguments: [
       tx.object(ADMIN_CAP_ID),
       tx.pure.vector("u8", sha256(subject)),
@@ -116,21 +116,33 @@ export async function createAuthorAttestation(
   return executeAttestation(tx);
 }
 
-export async function createPersonaAttestation(
-  authorObjectId: string,
+export async function registerPersona(
   subject: string,
-  personaHash: string,
-  uri: string
+  personaHash: string
 ): Promise<AttestationResult> {
   const tx = new Transaction();
   tx.moveCall({
-    target: `${PACKAGE_ID}::attestation::create_persona`,
+    target: `${PACKAGE_ID}::registrations::register_persona`,
     arguments: [
       tx.object(ADMIN_CAP_ID),
-      tx.object(authorObjectId),
       tx.pure.vector("u8", sha256(subject)),
       tx.pure.vector("u8", hexToBytes(personaHash)),
-      tx.pure.string(uri),
+    ],
+  });
+  return executeAttestation(tx);
+}
+
+export async function registerAuthorship(
+  subject: string,
+  authorSubject: string
+): Promise<AttestationResult> {
+  const tx = new Transaction();
+  tx.moveCall({
+    target: `${PACKAGE_ID}::registrations::register_authorship`,
+    arguments: [
+      tx.object(ADMIN_CAP_ID),
+      tx.pure.vector("u8", sha256(subject)),
+      tx.pure.vector("u8", sha256(authorSubject)),
     ],
   });
   return executeAttestation(tx);

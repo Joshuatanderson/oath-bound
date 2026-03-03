@@ -108,8 +108,8 @@ export async function POST(request: Request) {
   let suiObjectId: string | undefined;
 
   try {
-    const { createSkillAttestation } = await import("@/lib/sui");
-    const attestation = await createSkillAttestation(subject, tarHash, uri);
+    const { registerSkill } = await import("@/lib/sui");
+    const attestation = await registerSkill(subject, tarHash, uri);
     suiDigest = attestation.digest;
     suiObjectId = attestation.objectId ?? undefined;
   } catch (err) {
