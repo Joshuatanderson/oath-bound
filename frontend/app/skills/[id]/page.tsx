@@ -7,6 +7,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { ExternalLink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { AuditForm } from "./audit-form";
 import { CopyCommand } from "./copy-command";
 
@@ -83,14 +84,14 @@ export default async function SkillPage({
         <p className="text-lg text-muted-foreground">{skill.description}</p>
       </div>
 
-      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-        <span>License: {skill.license}</span>
-        {skill.compatibility && <span>Compat: {skill.compatibility}</span>}
-        {skill.allowed_tools && <span>Tools: {skill.allowed_tools}</span>}
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="secondary">License: {skill.license}</Badge>
+        {skill.compatibility && <Badge variant="secondary">Compat: {skill.compatibility}</Badge>}
+        {skill.allowed_tools && <Badge variant="secondary">Tools: {skill.allowed_tools}</Badge>}
         {skill.created_at && (
-          <span>
-            Created: {new Date(skill.created_at).toLocaleDateString()}
-          </span>
+          <Badge variant="secondary">
+            Verified: {new Date(skill.created_at).toLocaleDateString()}
+          </Badge>
         )}
       </div>
 
@@ -98,6 +99,10 @@ export default async function SkillPage({
         <div className="rounded-lg border border-border p-4">
           <h3 className="mb-3 text-sm font-medium">On-Chain Attestation</h3>
           <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Claim:</span>
+              <Badge variant="outline">Skill Registered</Badge>
+            </div>
             {skill.sui_digest && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Transaction:</span>

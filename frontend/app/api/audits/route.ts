@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerClient } from "@/lib/supabase.server";
+import { ensureChainWrite, registerAudit } from "@/lib/sui";
 
 const MAX_PDF_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -76,10 +77,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Validate skill exists
+  // Validate skill exists and fetch fields needed for chain attestation
   const { data: skill, error: skillError } = await supabase
     .from("skills")
-    .select("id")
+    .select("id, namespace, name, tar_hash")
     .eq("id", skillId)
     .single();
 
@@ -134,6 +135,29 @@ export async function POST(request: Request) {
     IpfsHash: string;
   };
 
+  // On-chain attestation (before DB — chain is the source of truth)
+  const subject = `skill:${skill.namespace}/${skill.name}`;
+  const ipfsUri = `ipfs://${ipfsCid}`;
+
+  let attestation;
+  try {
+    attestation = await ensureChainWrite(() =>
+      registerAudit(subject, skill.tar_hash, reportHash, ipfsUri)
+    );
+  } catch (err) {
+    // Rollback: unpin from Pinata
+    await fetch(`https://api.pinata.cloud/pinning/unpin/${ipfsCid}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${pinataJwt}` },
+    }).catch(() => {});
+
+    const message = err instanceof Error ? err.message : "unknown error";
+    return NextResponse.json(
+      { error: `Chain attestation failed: ${message}` },
+      { status: 502 }
+    );
+  }
+
   // Insert into DB
   const { error: insertError } = await supabase.from("audits").insert({
     skill_id: skillId,
@@ -141,15 +165,11 @@ export async function POST(request: Request) {
     ipfs_cid: ipfsCid,
     passed,
     uploader: user.id,
+    sui_digest: attestation.digest,
+    sui_object_id: attestation.objectId,
   });
 
   if (insertError) {
-    // Rollback: unpin from Pinata
-    await fetch(`https://api.pinata.cloud/pinning/unpin/${ipfsCid}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${pinataJwt}` },
-    }).catch(() => {});
-
     if (insertError.message.includes("Auditor cannot be the skill author")) {
       return NextResponse.json(
         { error: "You cannot audit your own skill." },

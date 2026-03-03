@@ -63,7 +63,7 @@ async function executeAttestation(tx: Transaction): Promise<AttestationResult> {
 // --- Chain write wrapper ---
 
 /** Await a chain write and confirm finality before returning. */
-export async function waitForChainWrite(
+export async function ensureChainWrite(
   chainFn: () => Promise<AttestationResult>
 ): Promise<AttestationResult> {
   const result = await chainFn();
@@ -75,8 +75,7 @@ export async function waitForChainWrite(
 
 export async function registerSkill(
   subject: string,
-  skillHash: string,
-  uri: string
+  skillHash: string
 ): Promise<AttestationResult> {
   const tx = new Transaction();
   tx.moveCall({
@@ -85,7 +84,7 @@ export async function registerSkill(
       tx.object(ADMIN_CAP_ID),
       tx.pure.vector("u8", sha256(subject)),
       tx.pure.vector("u8", hexToBytes(skillHash)),
-      tx.pure.string(uri),
+      tx.pure.string(""),
     ],
   });
   return executeAttestation(tx);

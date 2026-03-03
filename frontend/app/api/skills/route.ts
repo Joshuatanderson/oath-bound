@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerClient } from "@/lib/supabase.server";
 import { createTarBuffer, hashTar } from "@/lib/tar";
 import { parseFrontmatter, serializeFrontmatter } from "@/lib/skill-validator";
-import { waitForChainWrite, registerSkill } from "@/lib/sui";
+import { ensureChainWrite, registerSkill } from "@/lib/sui";
 import type { SkillFile } from "@/lib/skill-validator";
 import type { Database } from "@/lib/database.types";
 
@@ -103,14 +103,13 @@ export async function POST(request: Request) {
 
   // On-chain attestation
   const subject = `skill:${namespace}/${body.name}`;
-  const uri = `https://oathbound.ai/skills/${namespace}/${body.name}`;
 
   let suiDigest: string | undefined;
   let suiObjectId: string | undefined;
 
   try {
-    const attestation = await waitForChainWrite(() =>
-      registerSkill(subject, tarHash, uri)
+    const attestation = await ensureChainWrite(() =>
+      registerSkill(subject, tarHash)
     );
     suiDigest = attestation.digest;
     suiObjectId = attestation.objectId ?? undefined;

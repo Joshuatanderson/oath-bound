@@ -22,6 +22,8 @@ export type Database = {
           passed: boolean
           report_hash: string
           skill_id: string
+          sui_digest: string | null
+          sui_object_id: string | null
           uploader: string
         }
         Insert: {
@@ -31,6 +33,8 @@ export type Database = {
           passed: boolean
           report_hash: string
           skill_id: string
+          sui_digest?: string | null
+          sui_object_id?: string | null
           uploader: string
         }
         Update: {
@@ -40,6 +44,8 @@ export type Database = {
           passed?: boolean
           report_hash?: string
           skill_id?: string
+          sui_digest?: string | null
+          sui_object_id?: string | null
           uploader?: string
         }
         Relationships: [
