@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import {
   parseFrontmatter,
+  serializeFrontmatter,
   validateSkill,
   VALID_LICENSES,
   ALLOWED_DIRS,
@@ -41,6 +42,39 @@ function validSkillFiles(
     ...(overrides.extraFiles ?? []),
   ];
 }
+
+// ---------------------------------------------------------------------------
+// serializeFrontmatter
+// ---------------------------------------------------------------------------
+
+describe("serializeFrontmatter", () => {
+  test("roundtrip: parse then serialize produces equivalent output", () => {
+    const original = "---\nname: my-skill\ndescription: A useful skill\nlicense: MIT\n---\n# My Skill\n\nDo the thing.";
+    const { meta, body } = parseFrontmatter(original);
+    const result = serializeFrontmatter(meta, body);
+    expect(result).toBe(original);
+  });
+
+  test("preserves extra metadata fields", () => {
+    const original = "---\nname: test\nauthor: someone\nversion: 1.0.0\n---\nBody";
+    const { meta, body } = parseFrontmatter(original);
+    meta["name"] = "updated";
+    const result = serializeFrontmatter(meta, body);
+    expect(result).toContain("name: updated");
+    expect(result).toContain("author: someone");
+    expect(result).toContain("version: 1.0.0");
+  });
+
+  test("omits fields with empty string values", () => {
+    const result = serializeFrontmatter(
+      { name: "test", compatibility: "", license: "MIT" },
+      "Body"
+    );
+    expect(result).not.toContain("compatibility");
+    expect(result).toContain("name: test");
+    expect(result).toContain("license: MIT");
+  });
+});
 
 // ---------------------------------------------------------------------------
 // parseFrontmatter

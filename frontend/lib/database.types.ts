@@ -117,7 +117,7 @@ export type Database = {
           created_at: string | null
           display_name: string | null
           id: string
-          role: string
+          role: Database["public"]["Enums"]["user_role"]
           user_id: string
           username: string
         }
@@ -125,7 +125,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string
-          role?: string
+          role?: Database["public"]["Enums"]["user_role"]
           user_id: string
           username: string
         }
@@ -133,7 +133,7 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string
-          role?: string
+          role?: Database["public"]["Enums"]["user_role"]
           user_id?: string
           username?: string
         }
@@ -159,6 +159,7 @@ export type Database = {
         | "BUSL-1.1"
         | "MPL-2.0"
         | "PROPRIETARY"
+      user_role: "DEVELOPER" | "AUDITOR"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -299,6 +300,7 @@ export const Constants = {
         "MPL-2.0",
         "PROPRIETARY",
       ],
+      user_role: ["DEVELOPER", "AUDITOR"],
     },
   },
 } as const

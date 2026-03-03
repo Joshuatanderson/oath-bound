@@ -62,6 +62,16 @@ export function parseFrontmatter(content: string): {
   return { meta, body: match[2] };
 }
 
+export function serializeFrontmatter(
+  meta: Record<string, string>,
+  body: string
+): string {
+  const lines = Object.entries(meta)
+    .filter(([, v]) => v !== "")
+    .map(([k, v]) => `${k}: ${v}`);
+  return `---\n${lines.join("\n")}\n---\n${body}`;
+}
+
 export function validateSkill(files: SkillFile[]): ValidateResult {
   const checks: ValidationCheck[] = [];
   let blocking = false;
