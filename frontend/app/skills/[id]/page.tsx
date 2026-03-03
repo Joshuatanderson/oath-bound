@@ -6,6 +6,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import { ExternalLink } from "lucide-react";
 import { AuditForm } from "./audit-form";
 import { CopyCommand } from "./copy-command";
 
@@ -20,7 +21,7 @@ export default async function SkillPage({
   const { data: skill, error } = await supabase
     .from("skills")
     .select(
-      "id, name, namespace, description, license, version, compatibility, allowed_tools, created_at, user_id"
+      "id, name, namespace, description, license, version, compatibility, allowed_tools, created_at, user_id, sui_digest, sui_object_id"
     )
     .eq("id", id)
     .single();
@@ -73,6 +74,42 @@ export default async function SkillPage({
           </span>
         )}
       </div>
+
+      {(skill.sui_digest || skill.sui_object_id) && (
+        <div className="rounded-lg border border-border p-4">
+          <h3 className="mb-3 text-sm font-medium">On-Chain Attestation</h3>
+          <div className="flex flex-col gap-2">
+            {skill.sui_digest && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Transaction:</span>
+                <a
+                  href={`https://suiscan.xyz/testnet/tx/${skill.sui_digest}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-mono text-primary hover:underline"
+                >
+                  {skill.sui_digest}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            )}
+            {skill.sui_object_id && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Object:</span>
+                <a
+                  href={`https://suiscan.xyz/testnet/object/${skill.sui_object_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-mono text-primary hover:underline"
+                >
+                  {skill.sui_object_id}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <section className="flex flex-col gap-4">
         <h2 className="text-2xl font-semibold tracking-tight">Audits</h2>
