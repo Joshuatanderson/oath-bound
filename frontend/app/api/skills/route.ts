@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerClient } from "@/lib/supabase.server";
 import { createTarBuffer, hashTar } from "@/lib/tar";
+import { parseFrontmatter, serializeFrontmatter } from "@/lib/skill-validator";
 import type { SkillFile } from "@/lib/skill-validator";
 import type { Database } from "@/lib/database.types";
 
@@ -47,6 +48,35 @@ export async function POST(request: Request) {
   }
 
   const namespace = userRecord.username;
+
+  // Rewrite SKILL.md front matter with canonical form values
+  const rootDir = body.files[0].path.split("/")[0];
+  const skillIdx = body.files.findIndex(
+    (f) => f.path === `${rootDir}/SKILL.md`
+  );
+  if (skillIdx !== -1) {
+    const { meta, body: skillBody } = parseFrontmatter(
+      body.files[skillIdx].content
+    );
+
+    meta["name"] = body.name;
+    meta["description"] = body.description;
+    meta["license"] = body.license;
+
+    if (body.compatibility) {
+      meta["compatibility"] = body.compatibility;
+    } else {
+      delete meta["compatibility"];
+    }
+
+    if (body.allowedTools) {
+      meta["allowed-tools"] = body.allowedTools;
+    } else {
+      delete meta["allowed-tools"];
+    }
+
+    body.files[skillIdx].content = serializeFrontmatter(meta, skillBody);
+  }
 
   // Create tar and hash
   const tarBuffer = await createTarBuffer(body.files);
