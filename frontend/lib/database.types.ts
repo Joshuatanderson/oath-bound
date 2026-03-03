@@ -17,25 +17,25 @@ export type Database = {
       audits: {
         Row: {
           audited_at: string
-          auditor_name: string
           id: string
-          report_path: string | null
+          ipfs_cid: string
+          report_hash: string
           skill_id: string
           uploader: string
         }
         Insert: {
           audited_at?: string
-          auditor_name: string
           id?: string
-          report_path?: string | null
+          ipfs_cid: string
+          report_hash: string
           skill_id: string
           uploader: string
         }
         Update: {
           audited_at?: string
-          auditor_name?: string
           id?: string
-          report_path?: string | null
+          ipfs_cid?: string
+          report_hash?: string
           skill_id?: string
           uploader?: string
         }
@@ -45,13 +45,6 @@ export type Database = {
             columns: ["skill_id"]
             isOneToOne: false
             referencedRelation: "skills"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audits_uploader_fkey"
-            columns: ["uploader"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
