@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "oathbound-cli",
+      "name": "oathbound",
       "dependencies": {
         "@supabase/supabase-js": "^2",
       },
