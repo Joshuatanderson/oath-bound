@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import ScaleHero from "@/components/scale-hero";
+// import CardTitleTuner from "@/components/card-title-tuner";
 
 const rows: {
   bad: { icon: LucideIcon; text: string };
@@ -56,7 +57,7 @@ export default function Home() {
             <h1 className="text-7xl font-extralight tracking-normal text-teal-0">
               Oathbound
             </h1>
-            <p className="max-w-md text-lg text-teal-4">
+            <p className="max-w-md text-lg font-light tracking-normal text-white">
               Verifiably safe skills for the agent economy
             </p>
             <div className="flex gap-3 pt-2">
@@ -73,7 +74,7 @@ export default function Home() {
         {/* Comparison cards */}
         <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2">
           <Card className="flex flex-col gap-6 border-white/10 bg-zinc-900/40 p-8 backdrop-blur-md">
-            <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
+            <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
               Without Oathbound
             </h2>
             <div className="flex flex-col gap-4">
@@ -87,7 +88,7 @@ export default function Home() {
           </Card>
 
           <Card className="flex flex-col gap-6 border-white/10 bg-zinc-900/40 p-8 backdrop-blur-md">
-            <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
+            <h2 className="text-2xl font-semibold tracking-tight text-zinc-100">
               With Oathbound
             </h2>
             <div className="flex flex-col gap-4">
