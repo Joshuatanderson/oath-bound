@@ -32,7 +32,8 @@ export async function proxy(request: NextRequest) {
 
   // Username gate: signed-in users without a username get redirected to /setup
   const { pathname } = request.nextUrl;
-  if (!PUBLIC_PATHS.includes(pathname) && !pathname.startsWith("/api/")) {
+  const isPublic = PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/skills");
+  if (!isPublic && !pathname.startsWith("/api/")) {
     const hasAuth = request.cookies
       .getAll()
       .some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
@@ -49,6 +50,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|auth/callback).*)",
+    "/((?!_next/static|_next/image|favicon.ico|auth/).*)",
   ],
 };

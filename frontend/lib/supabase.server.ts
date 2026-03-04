@@ -13,8 +13,13 @@ export async function getServerClient() {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          for (const { name, value, options } of cookiesToSet) {
-            cookieStore.set(name, value, options);
+          try {
+            for (const { name, value, options } of cookiesToSet) {
+              cookieStore.set(name, value, options);
+            }
+          } catch {
+            // Called from a Server Component — can't write cookies.
+            // The proxy will handle session refresh.
           }
         },
       },

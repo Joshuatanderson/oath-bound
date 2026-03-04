@@ -196,7 +196,7 @@ export default function SetupPage() {
           onClick={async () => {
             await supabase.auth.signOut();
             document.cookie = "ob_username=; path=/; max-age=0";
-            router.replace("/");
+            window.location.href = "/";
           }}
         >
           Sign out

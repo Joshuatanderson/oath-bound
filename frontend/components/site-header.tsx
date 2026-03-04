@@ -80,7 +80,7 @@ export function SiteHeader() {
                   onClick={async () => {
                     await supabase.auth.signOut();
                     document.cookie = "ob_username=; path=/; max-age=0";
-                    window.location.reload();
+                    window.location.href = "/";
                   }}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
