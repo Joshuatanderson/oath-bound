@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2, ShieldCheck, ShieldX, ArrowLeft } from "lucide-react";
@@ -11,6 +11,18 @@ const supabase = getBrowserClient();
 type VerifyState = "loading" | "ready" | "verifying" | "approved" | "declined" | "error";
 
 export default function VerifyPage() {
+  return (
+    <Suspense fallback={
+      <main className="mx-auto flex w-full max-w-md flex-col items-center gap-6 px-6 py-20">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </main>
+    }>
+      <VerifyContent />
+    </Suspense>
+  );
+}
+
+function VerifyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo") || "/";
