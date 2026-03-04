@@ -64,7 +64,7 @@ const P = {
   edgeW: 0.1,
   glowW: 3,
   edgeAlpha: 0.45,
-  midrib: 0.6,
+  midrib: 0,
   waveSpeed: 0.5,
   waveScale: 0.004,
   colA: [8, 22, 24] as RGB,
