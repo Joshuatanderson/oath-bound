@@ -54,7 +54,7 @@ function waveRGB(
   return [rgb[0] * br | 0, rgb[1] * br | 0, rgb[2] * br | 0];
 }
 
-// --- Locked settings ---
+// --- Settings ---
 
 const P = {
   scaleH: 40,
@@ -62,18 +62,17 @@ const P = {
   vOverlap: 0.42,
   sizeVar: 0.05,
   edgeW: 0.1,
-  glowW: 2,
-  edgeAlpha: 0.54,
+  glowW: 3,
+  edgeAlpha: 0.45,
   midrib: 0.6,
   waveSpeed: 0.5,
   waveScale: 0.004,
-  colA: [17, 43, 44] as RGB,
-  colB: [255, 255, 255] as RGB,
-  colC: [16, 86, 88] as RGB,
-  brightness: 0.45,
+  colA: [8, 22, 24] as RGB,
+  colB: [160, 225, 230] as RGB,
+  colC: [14, 68, 72] as RGB,
+  brightness: 0.70,
+  bg: "#020809",
 };
-
-const BG = "#030b0c";
 
 // --- Component ---
 
@@ -99,7 +98,7 @@ export default function ScaleHero() {
     tRef.current += 0.016;
     const t = tRef.current;
 
-    ctx.fillStyle = BG;
+    ctx.fillStyle = p.bg;
     ctx.fillRect(0, 0, w, h);
 
     const H = p.scaleH;
@@ -147,7 +146,7 @@ export default function ScaleHero() {
         ctx.stroke();
 
         traceScale(ctx, cx, cy, localH, localW);
-        ctx.fillStyle = BG;
+        ctx.fillStyle = p.bg;
         ctx.fill();
 
         if (p.midrib > 0) {
@@ -176,7 +175,7 @@ export default function ScaleHero() {
   }, [anim]);
 
   return (
-    <div className="fixed inset-0 z-0" style={{ background: BG }}>
+    <div className="fixed inset-0 z-0" style={{ background: P.bg }}>
       <canvas ref={cvR} className="h-full w-full" />
     </div>
   );
