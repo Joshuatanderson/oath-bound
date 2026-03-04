@@ -80,4 +80,4 @@ The content hash algorithm is deterministic: files are sorted lexicographically 
 
 ## License
 
-Apache 2.0
+Business Source License 1.1 (BUSL-1.1). The Change Date is 2028-03-04, after which the code is available under Apache 2.0.
