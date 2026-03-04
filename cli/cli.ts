@@ -7,19 +7,20 @@ import { writeFileSync, readFileSync, unlinkSync, existsSync, readdirSync, statS
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const VERSION = '0.1.1';
+const VERSION = '0.1.2';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_T-rk0azNRqAMLLGCyadyhQ_ulk9685n';
 
-// --- ANSI ---
-const TEAL = '\x1b[38;2;63;168;164m'; // brand teal #3fa8a4
-const GREEN = '\x1b[32m';
-const RED = '\x1b[31m';
-const DIM = '\x1b[2m';
-const BOLD = '\x1b[1m';
-const RESET = '\x1b[0m';
+// --- ANSI (respect NO_COLOR standard: https://no-color.org) ---
+const USE_COLOR = process.env.NO_COLOR === undefined && process.stderr.isTTY;
+const TEAL = USE_COLOR ? '\x1b[38;2;63;168;164m' : ''; // brand teal #3fa8a4
+const GREEN = USE_COLOR ? '\x1b[32m' : '';
+const RED = USE_COLOR ? '\x1b[31m' : '';
+const DIM = USE_COLOR ? '\x1b[2m' : '';
+const BOLD = USE_COLOR ? '\x1b[1m' : '';
+const RESET = USE_COLOR ? '\x1b[0m' : '';
 
 // --- Types ---
 interface SkillRow {
@@ -67,7 +68,7 @@ function spinner(text: string): { stop: () => void } {
   return {
     stop() {
       clearInterval(interval);
-      process.stdout.write('\r\x1b[2K');
+      process.stdout.write(USE_COLOR ? '\r\x1b[2K' : '\n');
     },
   };
 }
@@ -180,8 +181,14 @@ async function readStdin(): Promise<string> {
 
 // --- Verify (SessionStart hook) ---
 async function verify(): Promise<void> {
-  const input = JSON.parse(await readStdin());
-  const sessionId: string = input.session_id;
+  let input: Record<string, unknown>;
+  try {
+    input = JSON.parse(await readStdin());
+  } catch {
+    process.stderr.write('oathbound verify: invalid JSON on stdin\n');
+    process.exit(1);
+  }
+  const sessionId: string = input.session_id as string;
   if (!sessionId) {
     process.stderr.write('oathbound verify: no session_id in stdin\n');
     process.exit(1);
@@ -276,9 +283,15 @@ async function verify(): Promise<void> {
 
 // --- Verify --check (PreToolUse hook) ---
 async function verifyCheck(): Promise<void> {
-  const input = JSON.parse(await readStdin());
-  const sessionId: string = input.session_id;
-  const skillName: string | undefined = input.tool_input?.skill;
+  let input: Record<string, unknown>;
+  try {
+    input = JSON.parse(await readStdin());
+  } catch {
+    process.stderr.write('oathbound verify --check: invalid JSON on stdin\n');
+    process.exit(1);
+  }
+  const sessionId: string = input.session_id as string;
+  const skillName: string | undefined = (input.tool_input as Record<string, unknown> | undefined)?.skill as string | undefined;
 
   if (!sessionId || !skillName) {
     // Can't verify — allow through (non-skill invocation or missing context)
@@ -291,7 +304,13 @@ async function verifyCheck(): Promise<void> {
     process.exit(0);
   }
 
-  const state: SessionState = JSON.parse(readFileSync(stateFile, 'utf-8'));
+  let state: SessionState;
+  try {
+    state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+  } catch {
+    process.stderr.write('oathbound verify --check: corrupt session state file\n');
+    process.exit(1);
+  }
 
   // Extract just the skill name (strip namespace/ prefix if present)
   const baseName = skillName.includes(':') ? skillName.split(':').pop()! : skillName;
@@ -380,7 +399,7 @@ async function pull(skillArg: string): Promise<void> {
   }
 
   const buffer = Buffer.from(await blob.arrayBuffer());
-  const tarFile = `${name}.tar.gz`;
+  const tarFile = join(tmpdir(), `oathbound-${name}-${Date.now()}.tar.gz`);
 
   // 3. Hash and verify
   const verify = spinner('Verifying...');
@@ -395,7 +414,14 @@ async function pull(skillArg: string): Promise<void> {
   }
 
   // 4. Find target directory and extract
-  const skillsDir = findSkillsDir();
+  let skillsDir = findSkillsDir();
+  if (!skillsDir.endsWith('.claude/skills') && !skillsDir.includes('.claude/skills')) {
+    // findSkillsDir() fell back to cwd — create .claude/skills instead of extracting into project root
+    skillsDir = join(process.cwd(), '.claude', 'skills');
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(skillsDir, { recursive: true });
+    console.log(`${DIM}   Created ${skillsDir}${RESET}`);
+  }
   writeFileSync(tarFile, buffer);
   try {
     execFileSync('tar', ['-xf', tarFile, '-C', skillsDir], { stdio: 'pipe' });
