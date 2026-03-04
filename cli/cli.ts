@@ -243,10 +243,13 @@ async function verify(): Promise<void> {
   for (const [name, localHash] of Object.entries(localHashes)) {
     const registryHash = registryHashes.get(name);
     if (!registryHash) {
+      process.stderr.write(`${DIM}   ${name}: ${localHash} (not in registry)${RESET}\n`);
       rejected.push({ name, reason: 'not in registry' });
     } else if (localHash !== registryHash) {
+      process.stderr.write(`${RED}   ${name}: ${localHash} ≠ ${registryHash}${RESET}\n`);
       rejected.push({ name, reason: `content hash mismatch (local: ${localHash.slice(0, 8)}…, registry: ${registryHash.slice(0, 8)}…)` });
     } else {
+      process.stderr.write(`${GREEN}   ${name}: ${localHash} ✓${RESET}\n`);
       verified[name] = localHash;
     }
   }
@@ -312,6 +315,7 @@ async function verifyCheck(): Promise<void> {
   const sessionHash = state.verified[baseName];
 
   if (!sessionHash) {
+    process.stderr.write(`${RED}   ${baseName}: ${currentHash} (not verified at session start)${RESET}\n`);
     console.log(JSON.stringify({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
@@ -323,6 +327,7 @@ async function verifyCheck(): Promise<void> {
   }
 
   if (currentHash !== sessionHash) {
+    process.stderr.write(`${RED}   ${baseName}: ${currentHash} ≠ ${sessionHash} (tampered)${RESET}\n`);
     console.log(JSON.stringify({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
@@ -332,6 +337,8 @@ async function verifyCheck(): Promise<void> {
     }));
     process.exit(0);
   }
+
+  process.stderr.write(`${GREEN}   ${baseName}: ${currentHash} ✓${RESET}\n`);
 
   // Hash matches — allow
   process.exit(0);
@@ -380,7 +387,10 @@ async function pull(skillArg: string): Promise<void> {
   const hash = createHash('sha256').update(buffer).digest('hex');
   verify.stop();
 
+  console.log(`${DIM}   tar hash: ${hash}${RESET}`);
+
   if (hash !== skill.tar_hash) {
+    console.log(`${RED}   expected: ${skill.tar_hash}${RESET}`);
     fail('Verification failed', `Downloaded file does not match expected hash for ${fullName}`);
   }
 
