@@ -23,7 +23,7 @@ export function CopyCommand({ command }: { command: string }) {
       <ChevronRight className="h-4 w-4 text-muted-foreground" />
       <span className="flex-1">{command}</span>
       {copied ? (
-        <Check className="h-4 w-4 text-green-500" />
+        <Check className="h-4 w-4 text-success" />
       ) : (
         <Copy className="h-4 w-4 text-muted-foreground" />
       )}

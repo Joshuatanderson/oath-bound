@@ -103,7 +103,7 @@ export function AuditForm({ skillId }: { skillId: string }) {
 
       {error && <p className="text-sm text-destructive">{error}</p>}
       {success && (
-        <p className="text-sm text-green-600">
+        <p className="text-sm text-success">
           Audit submitted and pinned to IPFS.
         </p>
       )}

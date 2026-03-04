@@ -50,7 +50,7 @@ export function SiteHeader() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <Avatar className="h-8 w-8 cursor-pointer">
+                  <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-border">
                     <AvatarImage
                       src={user.user_metadata?.avatar_url}
                       alt={user.user_metadata?.full_name ?? "User"}

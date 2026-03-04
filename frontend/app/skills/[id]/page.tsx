@@ -96,7 +96,7 @@ export default async function SkillPage({
       </div>
 
       {(skill.sui_digest || skill.sui_object_id) && (
-        <div className="rounded-lg border border-border p-4">
+        <Card className="p-4">
           <h3 className="mb-3 text-sm font-medium">On-Chain Attestation</h3>
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
@@ -132,7 +132,7 @@ export default async function SkillPage({
               </div>
             )}
           </div>
-        </div>
+        </Card>
       )}
 
       <section className="flex flex-col gap-4">
@@ -154,7 +154,7 @@ export default async function SkillPage({
                     <span
                       className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         audit.passed
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          ? "bg-success/10 text-success"
                           : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
                       }`}
                     >

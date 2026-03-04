@@ -5,7 +5,6 @@ license: MIT
 compatibility: Requires git
 allowed-tools: bash read grep
 ---
-
 # Git Changelog Generator
 
 Generate a well-formatted changelog from recent git commits.

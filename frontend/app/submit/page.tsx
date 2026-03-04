@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -343,7 +344,7 @@ export default function SubmitPage() {
           ) : (
             <div className="flex flex-col gap-4">
               {/* File tree */}
-              <div className="rounded-lg border border-border bg-muted/50">
+              <Card className="bg-muted/50">
                 <div className="flex items-center justify-between border-b border-border px-4 py-3">
                   <span className="text-sm font-medium">
                     {upload.files.length} file
@@ -367,10 +368,10 @@ export default function SubmitPage() {
                     ))}
                   </ul>
                 </div>
-              </div>
+              </Card>
 
               {/* Validation results */}
-              <div className="rounded-lg border border-border">
+              <Card>
                 <div className="border-b border-border px-4 py-3">
                   <span className="text-sm font-medium">Validation</span>
                 </div>
@@ -379,7 +380,7 @@ export default function SubmitPage() {
                     <li key={i} className="flex items-start gap-2 text-sm">
                       <span
                         className={
-                          c.passed ? "text-green-600" : "text-destructive"
+                          c.passed ? "text-success" : "text-destructive"
                         }
                       >
                         {c.passed ? "\u2713" : "\u2717"}
@@ -392,7 +393,7 @@ export default function SubmitPage() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Card>
 
               {/* Continue button */}
               <Button
@@ -532,7 +533,7 @@ export default function SubmitPage() {
 
           {/* On-chain attestation debug panel */}
           {(suiDigest || suiObjectId) && (
-            <div className="rounded-lg border border-border p-4">
+            <Card className="p-4">
               <h3 className="mb-3 text-sm font-medium">On-Chain Attestation</h3>
               <div className="flex flex-col gap-2">
                 {suiDigest && (
@@ -564,7 +565,7 @@ export default function SubmitPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </Card>
           )}
 
           <Button

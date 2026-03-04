@@ -17,7 +17,8 @@ Whenever you will have to read or write to the database, NEVER assume you know s
 - If `supabase link` didn't capture the DB password, pass `--db-url` explicitly.
 
 ## Design
-- always use shadcn and lucide as a base. Consult the user before pulling in any other packages. 
+- always use shadcn and lucide as a base. Consult the user before pulling in any other packages.
+- Before building any UI component (cards, dialogs, tables, etc.), always check if shadcn already provides one. Use the shadcn component — never recreate it with raw divs. If unsure whether a shadcn component exists, consult the user.
 - Always design mobile first. Design for the smallest screen size first, then scale up.
 
 ## Architecture

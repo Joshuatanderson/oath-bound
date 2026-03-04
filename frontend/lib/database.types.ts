@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      identity_verifications: {
+        Row: {
+          id: string
+          auth_user_id: string
+          persona_inquiry_id: string
+          status: string
+          created_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          auth_user_id: string
+          persona_inquiry_id: string
+          status: string
+          created_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          auth_user_id?: string
+          persona_inquiry_id?: string
+          status?: string
+          created_at?: string
+          completed_at?: string | null
+        }
+        Relationships: []
+      }
       audits: {
         Row: {
           audited_at: string
