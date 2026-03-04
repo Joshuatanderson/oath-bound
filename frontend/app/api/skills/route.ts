@@ -35,7 +35,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body: SkillSubmission = await request.json();
+  let body: SkillSubmission;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
   // Look up user record for namespace
   const { data: userRecord, error: userError } = await supabase

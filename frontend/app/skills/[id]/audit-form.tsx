@@ -36,24 +36,30 @@ export function AuditForm({ skillId }: { skillId: string }) {
     formData.append("passed", String(passed));
     formData.append("file", file);
 
-    const res = await fetch("/api/audits", {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      const res = await fetch("/api/audits", {
+        method: "POST",
+        body: formData,
+      });
 
-    const data = await res.json();
-    setSubmitting(false);
+      const data = await res.json();
+      setSubmitting(false);
 
-    if (!res.ok) {
-      setError(data.error ?? "Something went wrong");
+      if (!res.ok) {
+        setError(data.error ?? "Something went wrong");
+        return;
+      }
+
+      setSuccess(true);
+      setPassed(null);
+      setFileName(null);
+      if (fileRef.current) fileRef.current.value = "";
+      router.refresh();
+    } catch {
+      setError("Network error — please try again");
+      setSubmitting(false);
       return;
     }
-
-    setSuccess(true);
-    setPassed(null);
-    setFileName(null);
-    if (fileRef.current) fileRef.current.value = "";
-    router.refresh();
   }
 
   return (

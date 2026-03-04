@@ -235,46 +235,53 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
     checks.push({ passed: true, message: "Skill content present" });
   }
 
-  // Validate name — non-blocking
+  // Validate name
   const name = meta["name"] ?? "";
   if (!name) {
     checks.push({ passed: false, message: "Frontmatter missing: name" });
+    blocking = true;
   } else if (name.length > 64) {
     checks.push({
       passed: false,
       message: `Name exceeds 64 characters (${name.length})`,
     });
+    blocking = true;
   } else if (!NAME_PATTERN.test(name)) {
     checks.push({
       passed: false,
       message: `Invalid name: "${name}" — lowercase letters, numbers, and hyphens only, must not start or end with a hyphen`,
     });
+    blocking = true;
   } else {
     checks.push({ passed: true, message: `name: ${name}` });
   }
 
-  // Validate description — non-blocking
+  // Validate description
   const description = meta["description"] ?? "";
   if (!description) {
     checks.push({ passed: false, message: "Frontmatter missing: description" });
+    blocking = true;
   } else if (description.length > 1024) {
     checks.push({
       passed: false,
       message: `Description exceeds 1024 characters (${description.length})`,
     });
+    blocking = true;
   } else {
     checks.push({ passed: true, message: "description present" });
   }
 
-  // Validate license — non-blocking
+  // Validate license
   const license = meta["license"] ?? "";
   if (!license) {
     checks.push({ passed: false, message: "Frontmatter missing: license" });
+    blocking = true;
   } else if (!VALID_LICENSES.includes(license as typeof VALID_LICENSES[number])) {
     checks.push({
       passed: false,
       message: `Invalid license: "${license}"`,
     });
+    blocking = true;
   } else {
     checks.push({ passed: true, message: `license: ${license}` });
   }
