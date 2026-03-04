@@ -7,7 +7,7 @@ import { writeFileSync, readFileSync, unlinkSync, existsSync, readdirSync, statS
 import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
