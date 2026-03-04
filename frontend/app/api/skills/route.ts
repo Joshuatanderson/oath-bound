@@ -3,7 +3,11 @@ import { getServerClient } from "@/lib/supabase.server";
 import { getAdminClient } from "@/lib/supabase.admin";
 import { createTarBuffer, hashTar } from "@/lib/tar";
 import { contentHash } from "@/lib/content-hash";
-import { parseFrontmatter, serializeFrontmatter } from "@/lib/skill-validator";
+import {
+  parseFrontmatter,
+  serializeFrontmatter,
+  validateSkill,
+} from "@/lib/skill-validator";
 import { ensureChainWrite, registerSkill } from "@/lib/sui";
 import type { SkillFile } from "@/lib/skill-validator";
 import type { Database } from "@/lib/database.types";
@@ -67,6 +71,18 @@ export async function POST(request: Request) {
 
   const namespace = userRecord.username;
 
+  // Server-side validation — client-side checks can be bypassed via direct POST
+  const validation = validateSkill(body.files);
+  if (!validation.canProceed) {
+    const errors = validation.checks
+      .filter((c) => !c.passed)
+      .map((c) => c.message);
+    return NextResponse.json(
+      { error: "Validation failed", details: errors },
+      { status: 400 }
+    );
+  }
+
   // Rewrite SKILL.md front matter with canonical form values
   const rootDir = body.files[0].path.split("/")[0];
   const skillIdx = body.files.findIndex(
@@ -96,14 +112,23 @@ export async function POST(request: Request) {
     body.files[skillIdx].content = serializeFrontmatter(meta, skillBody);
   }
 
+  // Normalize tar root directory to match the validated skill name.
+  // The uploader may have used a different directory name in their files.
+  if (rootDir !== body.name) {
+    for (const f of body.files) {
+      f.path = body.name + f.path.slice(rootDir.length);
+    }
+  }
+
   // Create tar and hash
   const tarBuffer = await createTarBuffer(body.files);
   const tarHash = hashTar(tarBuffer);
 
   // Strip root dir prefix so paths match what's on disk after extraction
   // Upload files: "my-skill/SKILL.md" → CLI on disk: "SKILL.md"
+  // After normalization, root dir is always body.name
   const hashFiles = body.files.map((f) => ({
-    path: f.path.slice(rootDir.length + 1),
+    path: f.path.slice(body.name.length + 1),
     content: f.content,
   }));
   const contentHashValue = contentHash(hashFiles);

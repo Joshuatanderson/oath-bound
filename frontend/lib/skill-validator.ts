@@ -44,6 +44,15 @@ export const MAX_FILE_COUNT = 50;
 
 const NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+/** Directory segments blocked at any depth (matched case-insensitively) */
+const BLOCKED_SEGMENTS = ["node_modules", ".git", ".aws", ".ssh"];
+
+/** Exact basenames blocked (matched case-insensitively) */
+const BLOCKED_BASENAMES = [".npmrc", ".netrc", ".htpasswd"];
+
+/** Private key file names (matched case-insensitively) */
+const PRIVATE_KEY_NAMES = ["id_rsa", "id_ed25519", "id_ecdsa", "id_dsa"];
+
 export function parseFrontmatter(content: string): {
   meta: Record<string, string>;
   body: string;
@@ -130,6 +139,86 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
   }
   if (!blocking) {
     checks.push({ passed: true, message: "Directory structure valid" });
+  }
+
+  // Check for dangerous paths
+  for (const f of files) {
+    if (blocking) break;
+
+    const relative = f.path.slice(rootDir.length + 1);
+    const segments = relative.split("/");
+    const basename = segments[segments.length - 1];
+    const lowerBasename = basename.toLowerCase();
+    const lowerSegments = segments.map((s) => s.toLowerCase());
+
+    // Path traversal
+    if (segments.includes("..")) {
+      checks.push({
+        passed: false,
+        message:
+          "Upload contains path traversal (..) — remove paths that navigate outside the skill directory",
+      });
+      blocking = true;
+      break;
+    }
+
+    // Blocked directory segments (case-insensitive)
+    const blockedSeg = lowerSegments.find((s) => BLOCKED_SEGMENTS.includes(s));
+    if (blockedSeg) {
+      const messages: Record<string, string> = {
+        node_modules:
+          "Upload contains node_modules — remove dependencies before uploading",
+        ".git":
+          "Upload contains a .git directory — remove version control files before uploading",
+        ".aws":
+          "Upload contains .aws credentials directory — remove before uploading",
+        ".ssh":
+          "Upload contains .ssh directory — remove before uploading",
+      };
+      checks.push({
+        passed: false,
+        message: messages[blockedSeg] ?? `Upload contains blocked directory: ${blockedSeg}`,
+      });
+      blocking = true;
+      break;
+    }
+
+    // Environment files (case-insensitive, broad pattern)
+    if (
+      lowerBasename === ".env" ||
+      lowerBasename === ".envrc" ||
+      ((lowerBasename.startsWith(".env.") ||
+        lowerBasename.startsWith(".env-") ||
+        lowerBasename.startsWith(".env_")) &&
+        lowerBasename !== ".env.example")
+    ) {
+      checks.push({
+        passed: false,
+        message: `Upload contains an environment file (${relative}) — remove to avoid leaking secrets`,
+      });
+      blocking = true;
+      break;
+    }
+
+    // Credential files
+    if (BLOCKED_BASENAMES.includes(lowerBasename)) {
+      checks.push({
+        passed: false,
+        message: `Upload contains a credentials file (${relative}) — remove to avoid leaking secrets`,
+      });
+      blocking = true;
+      break;
+    }
+
+    // Private key files
+    if (PRIVATE_KEY_NAMES.includes(lowerBasename)) {
+      checks.push({
+        passed: false,
+        message: `Upload contains a private key file (${relative}) — remove before uploading`,
+      });
+      blocking = true;
+      break;
+    }
   }
 
   // Parse frontmatter

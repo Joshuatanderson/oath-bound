@@ -255,6 +255,233 @@ describe("validateSkill — structure errors (canProceed = false)", () => {
     expect(result.checks.some((c) => c.message.includes("no content"))).toBe(true);
   });
 
+  // -- Path traversal --
+
+  test("path traversal with .. rejected", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/../../etc/passwd", content: "root:x:0:0" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+    expect(result.checks.some((c) => c.message.includes("path traversal"))).toBe(true);
+  });
+
+  // -- node_modules --
+
+  test("node_modules inside scripts/", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/node_modules/foo/index.js", content: "module.exports = {}" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+    expect(result.checks.some((c) => c.message.includes("node_modules"))).toBe(true);
+  });
+
+  test("NODE_MODULES (case-insensitive) rejected", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/NODE_MODULES/foo/index.js", content: "module.exports = {}" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+    expect(result.checks.some((c) => c.message.includes("node_modules"))).toBe(true);
+  });
+
+  test("node_modules at root level", () => {
+    const result = validateSkill([
+      ...validSkillFiles(),
+      { path: "my-skill/node_modules/foo/index.js", content: "module.exports = {}" },
+    ]);
+    expect(result.canProceed).toBe(false);
+  });
+
+  // -- .env variants --
+
+  test(".env file inside assets/", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/assets/.env", content: "SECRET=abc" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+    expect(result.checks.some((c) => c.message.includes("environment file"))).toBe(true);
+  });
+
+  test(".env.local file rejected", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/.env.local", content: "SECRET=abc" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+  });
+
+  test(".ENV (case-insensitive) rejected", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/.ENV", content: "SECRET=abc" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+  });
+
+  test(".envrc (direnv) rejected", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/.envrc", content: "export SECRET=abc" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+  });
+
+  test(".env-local rejected", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/.env-local", content: "SECRET=abc" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+  });
+
+  test(".env_production rejected", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/.env_production", content: "SECRET=abc" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+  });
+
+  test(".env.example file allowed", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/.env.example", content: "SECRET=" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(true);
+  });
+
+  // -- .git directory --
+
+  test(".git directory rejected", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/.git/config", content: "[remote]" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+    expect(result.checks.some((c) => c.message.includes(".git"))).toBe(true);
+  });
+
+  // -- Credential files --
+
+  test(".npmrc rejected", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/.npmrc", content: "//registry.npmjs.org/:_authToken=secret" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+    expect(result.checks.some((c) => c.message.includes("credentials"))).toBe(true);
+  });
+
+  test(".netrc rejected", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/.netrc", content: "machine github.com" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+  });
+
+  // -- Private key files --
+
+  test("id_rsa rejected", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/id_rsa", content: "-----BEGIN RSA PRIVATE KEY-----" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+    expect(result.checks.some((c) => c.message.includes("private key"))).toBe(true);
+  });
+
+  test("id_ed25519 rejected", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/assets/id_ed25519", content: "-----BEGIN OPENSSH PRIVATE KEY-----" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(false);
+  });
+
+  // -- False positives (should pass) --
+
+  test("file with env in name passes (not a dotenv)", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/scripts/setup-env.sh", content: "#!/bin/bash" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(true);
+  });
+
+  test("node_modules-guide.md passes (not a directory segment)", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/references/node_modules-guide.md", content: "# Guide" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(true);
+  });
+
+  test("environment.env passes (not a dotenv)", () => {
+    const result = validateSkill(
+      validSkillFiles({
+        extraFiles: [
+          { path: "my-skill/references/environment.env", content: "docs" },
+        ],
+      })
+    );
+    expect(result.canProceed).toBe(true);
+  });
+
   test("bare SKILL.md with no folder", () => {
     const result = validateSkill([
       { path: "SKILL.md", content: buildSkillMd({ name: "test", description: "A skill", license: "MIT" }, "# Body") },
