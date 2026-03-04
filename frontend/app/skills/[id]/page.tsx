@@ -94,6 +94,7 @@ export default async function SkillPage({
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <Badge variant="outline">by {skill.namespace}</Badge>
         <Badge variant="secondary">License: {skill.license}</Badge>
         {skill.compatibility && <Badge variant="secondary">Compat: {skill.compatibility}</Badge>}
         {skill.allowed_tools && <Badge variant="secondary">Tools: {skill.allowed_tools}</Badge>}
