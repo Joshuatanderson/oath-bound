@@ -7,7 +7,7 @@ import {
   UserCheck,
   ShieldOff,
   ShieldCheck,
-  RefreshCw,
+  TriangleAlert,
   Lock,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -19,27 +19,30 @@ const rows: {
   good: { icon: LucideIcon; text: string };
 }[] = [
   {
-    bad: { icon: UserX, text: "Pseudonymous authors behind usernames" },
-    good: { icon: UserCheck, text: "Every author verified by government ID" },
+    bad: { icon: UserX, text: "Your agents trust code from strangers" },
+    good: {
+      icon: UserCheck,
+      text: "Every developer verified by government ID",
+    },
   },
   {
     bad: {
       icon: ShieldOff,
-      text: "No review before your agent executes a skill",
+      text: "No review before execution",
     },
     good: {
       icon: ShieldCheck,
-      text: "Independent skill security audits",
+      text: "Independent security audits on every skill",
     },
   },
   {
     bad: {
-      icon: RefreshCw,
-      text: "A version bump silently inherits all prior trust",
+      icon: TriangleAlert,
+      text: "Malicious updates inherit full trust",
     },
     good: {
       icon: Lock,
-      text: "Change one byte, the audit no longer applies",
+      text: "Every audit locked to the exact code reviewed.",
     },
   },
 ];
@@ -58,7 +61,7 @@ export default function Home() {
               Oathbound
             </h1>
             <p className="max-w-md text-lg font-light tracking-normal text-white">
-              Verifiably safe skills for the agent economy
+              Verified developers. Audited skills. Cryptographic proof.
             </p>
             <div className="flex gap-3 pt-2">
               <Button asChild size="lg">
