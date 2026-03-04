@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 
 // Postinstall script: downloads the correct platform binary from GitHub Releases.
+// Skips download in CI (binaries don't exist yet during the build job).
+
+if (process.env.CI) {
+  console.log("oathbound: skipping binary download in CI");
+  process.exit(0);
+}
 
 const https = require("https");
 const fs = require("fs");
