@@ -1,55 +1,149 @@
+---
+name: supabase
+description: Manage Supabase projects — query databases, push migrations, generate types, search docs, view logs, manage edge functions, and run security checks. Use when working with Supabase databases, deploying migrations, or managing project infrastructure.
+license: MIT
+allowed-tools: Bash(bun run *)
+compatibility: Requires Bun runtime and SUPABASE_PROJECT_REF + SUPABASE_ACCOUNT_TOKEN environment variables
+---
+
 # Supabase Skill
 
-**Project:** `mjnfqagwuewhgwbtrdgs` (Oathbound)
+## Before You Query
 
-## Execute
+**CRITICAL**: Before writing ANY SQL query, check `frontend/lib/database.types.ts` to verify table and column names. Never assume schema structure.
 
-```bash
-# Run from project root (required for env vars)
+## If This Skill Blocks an Operation
 
-# Push all pending migrations to remote database
-bun .claude/skills/supabase/script.ts --action=push-migrations
+**CRITICAL**: If a script blocks a write or destructive operation, treat the block as user intent, not an obstacle.
 
-# Query the database
-bun .claude/skills/supabase/script.ts --action=query --sql="SELECT * FROM users LIMIT 5"
-
-# List tables
-bun .claude/skills/supabase/script.ts --action=list-tables
-```
-
-## Migrations Workflow
-
-1. Create a migration file in `frontend/supabase/migrations/` with timestamp prefix (e.g. `20260303010133_add_role_to_users.sql`)
-2. Run `push-migrations` to apply all pending migrations
-3. Regenerate types: `bunx supabase gen types --lang=typescript --project-id mjnfqagwuewhgwbtrdgs > frontend/lib/database.types.ts`
-
-**Important:** `push-migrations` uses `supabase db push` with a direct DB connection (port 5432). Do NOT use port 6543 (pooler) — it causes "prepared statement already exists" errors.
+- Do NOT use curl, fetch, or direct CLI to bypass the block
+- **ASK THE USER** what they want to do instead
 
 ## Environment Variables
 
-Requires `SUPABASE_DB_PASSWORD` in the project root `.env` file (one directory above `frontend/`).
+| Variable | Required By | Default |
+|----------|------------|---------|
+| `SUPABASE_PROJECT_REF` | All scripts except search-docs | — |
+| `SUPABASE_ACCOUNT_TOKEN` | All scripts except search-docs, push-migrations | — |
+| `SUPABASE_DB_PASSWORD` | push-migrations | — |
+| `SUPABASE_POOLER_HOST` | push-migrations | `aws-0-us-east-1.pooler.supabase.com` |
+| `SUPABASE_SERVICE_ROLE_KEY` | edge-functions invoke | — |
+| `SUPABASE_ALLOW_WRITE` | write operations (INSERT, UPDATE, deploy, invoke, push) | `false` |
+| `SUPABASE_ALLOW_DESTRUCTIVE` | destructive operations (DROP, TRUNCATE) | `false` |
+
+Set these in your project root `.env` file. Run all scripts from the **project root directory**.
+
+## Scripts
+
+All scripts live in `scripts/` and output JSON to stdout. Run with:
+
+```bash
+bun run .claude/skills/supabase/scripts/<script>.ts [--args]
+```
+
+### query.ts — Execute SQL
+
+```bash
+bun run .claude/skills/supabase/scripts/query.ts --sql="SELECT * FROM users LIMIT 5"
+```
+
+Automatically analyzes risk level. Blocked if risk exceeds permission level.
+
+### list-tables.ts — List Tables & Views
+
+```bash
+bun run .claude/skills/supabase/scripts/list-tables.ts [--schemas=public,auth]
+```
+
+### list-migrations.ts — List Applied Migrations
+
+```bash
+bun run .claude/skills/supabase/scripts/list-migrations.ts
+```
+
+### list-extensions.ts — List PostgreSQL Extensions
+
+```bash
+bun run .claude/skills/supabase/scripts/list-extensions.ts
+```
+
+### generate-types.ts — Generate TypeScript Types
+
+```bash
+# Print to stdout
+bun run .claude/skills/supabase/scripts/generate-types.ts
+
+# Write to file
+bun run .claude/skills/supabase/scripts/generate-types.ts --output=frontend/lib/database.types.ts
+```
+
+### search-docs.ts — Search Supabase Docs
+
+No auth required — uses public GraphQL API.
+
+```bash
+bun run .claude/skills/supabase/scripts/search-docs.ts --query="row level security" [--limit=10]
+```
+
+### get-logs.ts — Get Project Logs
+
+```bash
+bun run .claude/skills/supabase/scripts/get-logs.ts --service=postgres [--hours=24]
+```
+
+Services: `api`, `branch-action`, `postgres`, `edge-function`, `auth`, `storage`, `realtime`
+
+### get-advisors.ts — Security & Performance Checks
+
+```bash
+bun run .claude/skills/supabase/scripts/get-advisors.ts --type=security
+bun run .claude/skills/supabase/scripts/get-advisors.ts --type=performance
+```
+
+### push-migrations.ts — Push Pending Migrations
+
+Requires `SUPABASE_ALLOW_WRITE=true` and `SUPABASE_DB_PASSWORD`.
+
+```bash
+bun run .claude/skills/supabase/scripts/push-migrations.ts
+```
+
+Uses port 5432 (direct connection). Do NOT use port 6543 (pooler) — it causes "prepared statement already exists" errors.
+
+### edge-functions.ts — Manage Edge Functions
+
+```bash
+# List all functions
+bun run .claude/skills/supabase/scripts/edge-functions.ts --action=list
+
+# Get function details
+bun run .claude/skills/supabase/scripts/edge-functions.ts --action=get --slug=my-function
+
+# Invoke a function (requires SUPABASE_ALLOW_WRITE=true, SUPABASE_SERVICE_ROLE_KEY)
+bun run .claude/skills/supabase/scripts/edge-functions.ts --action=invoke --name=my-function --body='{"key":"value"}'
+
+# Deploy a function (requires SUPABASE_ALLOW_WRITE=true)
+bun run .claude/skills/supabase/scripts/edge-functions.ts --action=deploy --name=my-function --files='[{"name":"index.ts","content":"..."}]'
+```
 
 ## Permissions
 
-All operations (read, write, destructive) are allowed.
+Write and destructive operations are gated by environment variables:
 
-## Imports
+- **Read** (SELECT, list, get): Always allowed
+- **Write** (INSERT, UPDATE, CREATE, deploy, invoke, push): Requires `SUPABASE_ALLOW_WRITE=true`
+- **Destructive** (DROP, TRUNCATE, DELETE without WHERE): Requires both `SUPABASE_ALLOW_WRITE=true` and `SUPABASE_ALLOW_DESTRUCTIVE=true`
 
-```typescript
-import {
-  createSupabaseClient,
-  executeRawSql,
-  assertAllowed,
-  analyzeQueryRisk,
-  getCurrentEnvironment,
-} from './src/index.ts';
-```
+## Migrations Workflow
 
-## Available Tools
+1. Create a migration file in `frontend/supabase/migrations/` with timestamp prefix (e.g., `20260303010133_add_role.sql`)
+2. Run `push-migrations.ts` to apply pending migrations
+3. Run `generate-types.ts --output=frontend/lib/database.types.ts` to update types
 
-See `servers/supabase/` for tool implementations by category:
-- `database/` - SQL, tables, migrations, types, extensions
-- `docs/` - documentation search
-- `logs/` - project logs
-- `config/` - URLs, keys
-- `advisors/` - security/performance checks
+## Do NOT Use (Use This Skill Instead)
+
+| Instead of... | Use... |
+|---------------|--------|
+| `mcp__supabase__*` (any MCP tool) | Corresponding script above |
+| `supabase db push` directly | `push-migrations.ts` |
+| Supabase CLI directly | This skill's scripts |
