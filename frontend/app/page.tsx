@@ -11,6 +11,7 @@ import {
   Lock,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import ScaleHero from "@/components/scale-hero";
 
 const rows: {
   bad: { icon: LucideIcon; text: string };
@@ -44,59 +45,62 @@ const rows: {
 
 export default function Home() {
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col px-6 py-10">
-      <div className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center gap-12 text-center">
-        <div className="flex flex-col items-center gap-4">
-          <Shield className="h-14 w-14 text-primary" />
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            Oathbound
-          </h1>
-          <p className="max-w-md text-lg text-muted-foreground">
-            Verifiably safe skills for the agent economy
-          </p>
-          <div className="flex gap-3 pt-2">
-            <Button asChild size="lg">
-              <Link href="/submit">Submit a skill</Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link href="/skills">View skills</Link>
-            </Button>
+    <>
+      <ScaleHero />
+
+      <main className="relative z-10 mx-auto flex w-full max-w-4xl flex-col px-6 py-10">
+        {/* Hero */}
+        <div className="flex flex-col items-center justify-center pt-24 pb-16 text-center sm:pt-32">
+          <div className="flex flex-col items-center gap-4">
+            <Shield className="h-14 w-14 text-teal-2" />
+            <h1 className="text-4xl font-bold tracking-tight text-teal-0 sm:text-5xl">
+              Oathbound
+            </h1>
+            <p className="max-w-md text-lg text-teal-4">
+              Verifiably safe skills for the agent economy
+            </p>
+            <div className="flex gap-3 pt-2">
+              <Button asChild size="lg">
+                <Link href="/submit">Submit a skill</Link>
+              </Button>
+              <Button asChild variant="outline" size="lg">
+                <Link href="/skills">View skills</Link>
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Comparison cards */}
         <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2">
-          {/* Today card */}
-          <Card className="flex flex-col gap-6 p-8">
-            <h2 className="text-2xl font-bold tracking-tight">
+          <Card className="flex flex-col gap-6 border-white/10 bg-zinc-900/80 p-8 backdrop-blur-sm">
+            <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
               Without Oathbound
             </h2>
             <div className="flex flex-col gap-4">
               {rows.map((row, i) => (
                 <div key={i} className="flex min-h-14 items-center gap-4">
-                  <row.bad.icon className="h-5 w-5 shrink-0 text-red-500" />
-                  <p className="text-sm">{row.bad.text}</p>
+                  <row.bad.icon className="h-5 w-5 shrink-0 text-red-400" />
+                  <p className="text-sm text-zinc-300">{row.bad.text}</p>
                 </div>
               ))}
             </div>
           </Card>
 
-          {/* With Oathbound card */}
-          <Card className="flex flex-col gap-6 p-8">
-            <h2 className="text-2xl font-bold tracking-tight">
+          <Card className="flex flex-col gap-6 border-white/10 bg-zinc-900/80 p-8 backdrop-blur-sm">
+            <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
               With Oathbound
             </h2>
             <div className="flex flex-col gap-4">
               {rows.map((row, i) => (
                 <div key={i} className="flex min-h-14 items-center gap-4">
-                  <row.good.icon className="h-5 w-5 shrink-0 text-teal-5" />
-                  <p className="text-sm">{row.good.text}</p>
+                  <row.good.icon className="h-5 w-5 shrink-0 text-teal-3" />
+                  <p className="text-sm text-zinc-300">{row.good.text}</p>
                 </div>
               ))}
             </div>
           </Card>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }
