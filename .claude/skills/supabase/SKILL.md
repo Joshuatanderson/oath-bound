@@ -5,7 +5,6 @@ license: MIT
 allowed-tools: Bash(bun run *)
 compatibility: Requires Bun runtime and SUPABASE_PROJECT_REF + SUPABASE_ACCOUNT_TOKEN environment variables
 ---
-
 # Supabase Skill
 
 ## Before You Query
