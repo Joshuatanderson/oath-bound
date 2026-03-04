@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import ScaleHero from "@/components/scale-hero";
-// import CardTitleTuner from "@/components/card-title-tuner";
 
 const rows: {
   bad: { icon: LucideIcon; text: string };
