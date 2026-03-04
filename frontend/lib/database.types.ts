@@ -14,33 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      identity_verifications: {
-        Row: {
-          id: string
-          auth_user_id: string
-          persona_inquiry_id: string
-          status: string
-          created_at: string
-          completed_at: string | null
-        }
-        Insert: {
-          id?: string
-          auth_user_id: string
-          persona_inquiry_id: string
-          status: string
-          created_at?: string
-          completed_at?: string | null
-        }
-        Update: {
-          id?: string
-          auth_user_id?: string
-          persona_inquiry_id?: string
-          status?: string
-          created_at?: string
-          completed_at?: string | null
-        }
-        Relationships: []
-      }
       audits: {
         Row: {
           audited_at: string
@@ -85,10 +58,55 @@ export type Database = {
           },
         ]
       }
+      identity_verifications: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          persona_hash: string | null
+          persona_inquiry_id: string
+          status: string
+          sui_digest: string | null
+          sui_object_id: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          persona_hash?: string | null
+          persona_inquiry_id: string
+          status: string
+          sui_digest?: string | null
+          sui_object_id?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          persona_hash?: string | null
+          persona_inquiry_id?: string
+          status?: string
+          sui_digest?: string | null
+          sui_object_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "identity_verifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       skills: {
         Row: {
           allowed_tools: string | null
           compatibility: string | null
+          content_hash: string | null
           created_at: string | null
           description: string
           id: string
@@ -106,6 +124,7 @@ export type Database = {
         Insert: {
           allowed_tools?: string | null
           compatibility?: string | null
+          content_hash?: string | null
           created_at?: string | null
           description: string
           id?: string
@@ -123,6 +142,7 @@ export type Database = {
         Update: {
           allowed_tools?: string | null
           compatibility?: string | null
+          content_hash?: string | null
           created_at?: string | null
           description?: string
           id?: string

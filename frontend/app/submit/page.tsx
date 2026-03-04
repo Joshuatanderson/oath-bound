@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, ExternalLink } from "lucide-react";
+import { Loader2, ExternalLink, ShieldCheck } from "lucide-react";
 import {
   validateSkill,
   VALID_LICENSES,
@@ -53,6 +53,7 @@ const EMPTY_UPLOAD: UploadState = {
 export default function SubmitPage() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [verified, setVerified] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [upload, setUpload] = useState<UploadState>(EMPTY_UPLOAD);
   const [dragging, setDragging] = useState(false);
@@ -60,7 +61,15 @@ export default function SubmitPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
-      setAuthLoading(false);
+      if (data.user) {
+        fetch("/api/verify/status")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => setVerified(d?.verified ?? false))
+          .catch(() => setVerified(false))
+          .finally(() => setAuthLoading(false));
+      } else {
+        setAuthLoading(false);
+      }
     });
   }, []);
 
@@ -276,8 +285,29 @@ export default function SubmitPage() {
         </div>
       )}
 
+      {/* Verification gate */}
+      {!authLoading && !verified && user && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Identity verification required
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            You need to verify your identity before you can publish skills on
+            Oath Bound.
+          </p>
+          <Button
+            size="lg"
+            className="w-fit"
+            onClick={() => window.location.assign("/verify?returnTo=/submit")}
+          >
+            <ShieldCheck className="mr-2 h-4 w-4" />
+            Verify identity
+          </Button>
+        </div>
+      )}
+
       {/* Step indicator */}
-      {!submitted && !authLoading && (
+      {!submitted && !authLoading && verified && (
         <div className="flex gap-6 text-sm">
           <span className={step === 1 ? "font-bold" : "text-muted-foreground"}>
             1. Upload
@@ -289,7 +319,7 @@ export default function SubmitPage() {
       )}
 
       {/* Step 1: Upload */}
-      {!submitted && step === 1 && (
+      {!submitted && verified && step === 1 && (
         <div className="flex flex-col gap-6">
           {/* Expected format */}
           <div className="flex flex-col gap-3">
@@ -411,7 +441,7 @@ export default function SubmitPage() {
       )}
 
       {/* Step 2: Review & Edit */}
-      {!submitted && step === 2 && (
+      {!submitted && verified && step === 2 && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           <h2 className="text-2xl font-semibold tracking-tight">
             Review & Edit
@@ -514,9 +544,20 @@ export default function SubmitPage() {
             >
               Back
             </Button>
-            <Button type="submit" size="lg" disabled={!canSubmit}>
-              {submitting ? "Submitting\u2026" : "Submit Skill"}
-            </Button>
+            {verified ? (
+              <Button type="submit" size="lg" disabled={!canSubmit}>
+                {submitting ? "Submitting\u2026" : "Submit Skill"}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="lg"
+                onClick={() => window.location.assign("/verify?returnTo=/submit")}
+              >
+                <ShieldCheck className="mr-2 h-4 w-4" />
+                Verify identity to submit
+              </Button>
+            )}
           </div>
         </form>
       )}

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerClient } from "@/lib/supabase.server";
+import { getAdminClient } from "@/lib/supabase.admin";
 import { createTarBuffer, hashTar } from "@/lib/tar";
+import { contentHash } from "@/lib/content-hash";
 import { parseFrontmatter, serializeFrontmatter } from "@/lib/skill-validator";
 import { ensureChainWrite, registerSkill } from "@/lib/sui";
 import type { SkillFile } from "@/lib/skill-validator";
@@ -48,6 +50,21 @@ export async function POST(request: Request) {
     );
   }
 
+  // Enforce identity verification before allowing skill submission
+  const admin = getAdminClient();
+  const { data: verification } = await admin
+    .from("identity_verifications")
+    .select("status")
+    .eq("user_id", userRecord.id)
+    .single();
+
+  if (verification?.status !== "approved") {
+    return NextResponse.json(
+      { error: "Identity verification required before submitting skills" },
+      { status: 403 }
+    );
+  }
+
   const namespace = userRecord.username;
 
   // Rewrite SKILL.md front matter with canonical form values
@@ -82,6 +99,14 @@ export async function POST(request: Request) {
   // Create tar and hash
   const tarBuffer = await createTarBuffer(body.files);
   const tarHash = hashTar(tarBuffer);
+
+  // Strip root dir prefix so paths match what's on disk after extraction
+  // Upload files: "my-skill/SKILL.md" → CLI on disk: "SKILL.md"
+  const hashFiles = body.files.map((f) => ({
+    path: f.path.slice(rootDir.length + 1),
+    content: f.content,
+  }));
+  const contentHashValue = contentHash(hashFiles);
 
   // Upload to storage
   const version = 1;
@@ -135,6 +160,7 @@ export async function POST(request: Request) {
     allowed_tools: body.allowedTools || null,
     storage_path: storagePath,
     tar_hash: tarHash,
+    content_hash: contentHashValue,
     user_id: userRecord.id,
     sui_digest: suiDigest,
     sui_object_id: suiObjectId,

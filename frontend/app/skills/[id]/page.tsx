@@ -6,7 +6,8 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, ShieldCheck } from "lucide-react";
+import { getAdminClient } from "@/lib/supabase.admin";
 import { Badge } from "@/components/ui/badge";
 import { AuditForm } from "./audit-form";
 import { CopyCommand } from "./copy-command";
@@ -71,6 +72,14 @@ export default async function SkillPage({
     isAuditor = userRecord?.role === "AUDITOR";
   }
 
+  // Look up author's identity verification (both use public.users.id)
+  const admin = getAdminClient();
+  const { data: authorVerification } = await admin
+    .from("identity_verifications")
+    .select("status, sui_digest, sui_object_id")
+    .eq("user_id", skill.user_id)
+    .single();
+
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-10">
       <div className="flex flex-col gap-2">
@@ -127,6 +136,45 @@ export default async function SkillPage({
                   className="inline-flex items-center gap-1 text-xs font-mono text-primary hover:underline"
                 >
                   {skill.sui_object_id}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {authorVerification?.status === "approved" && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldCheck className="h-4 w-4 text-success" />
+            <h3 className="text-sm font-medium">Author Identity Verified</h3>
+          </div>
+          <div className="flex flex-col gap-2">
+            {authorVerification.sui_digest && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Transaction:</span>
+                <a
+                  href={`https://suiscan.xyz/testnet/tx/${authorVerification.sui_digest}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-mono text-primary hover:underline"
+                >
+                  {authorVerification.sui_digest}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            )}
+            {authorVerification.sui_object_id && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Object:</span>
+                <a
+                  href={`https://suiscan.xyz/testnet/object/${authorVerification.sui_object_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-mono text-primary hover:underline"
+                >
+                  {authorVerification.sui_object_id}
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>

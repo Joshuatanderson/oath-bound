@@ -138,7 +138,7 @@ export default function SetupPage() {
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             )}
             {!usernameChecking && usernameAvailable === true && (
-              <Check className="h-4 w-4 text-green-600" />
+              <Check className="h-4 w-4 text-success" />
             )}
             {!usernameChecking && usernameAvailable === false && (
               <X className="h-4 w-4 text-destructive" />
