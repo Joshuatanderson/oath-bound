@@ -53,7 +53,7 @@ export default function Home() {
         <div className="flex flex-col items-center justify-center pt-24 pb-16 text-center sm:pt-32">
           <div className="flex flex-col items-center gap-4">
             <Shield className="h-14 w-14 text-teal-2" />
-            <h1 className="text-4xl font-bold tracking-tight text-teal-0 sm:text-5xl">
+            <h1 className="text-7xl font-extralight tracking-normal text-teal-0">
               Oathbound
             </h1>
             <p className="max-w-md text-lg text-teal-4">
@@ -72,7 +72,7 @@ export default function Home() {
 
         {/* Comparison cards */}
         <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2">
-          <Card className="flex flex-col gap-6 border-white/10 bg-zinc-900/80 p-8 backdrop-blur-sm">
+          <Card className="flex flex-col gap-6 border-white/10 bg-zinc-900/40 p-8 backdrop-blur-md">
             <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
               Without Oathbound
             </h2>
@@ -86,7 +86,7 @@ export default function Home() {
             </div>
           </Card>
 
-          <Card className="flex flex-col gap-6 border-white/10 bg-zinc-900/80 p-8 backdrop-blur-sm">
+          <Card className="flex flex-col gap-6 border-white/10 bg-zinc-900/40 p-8 backdrop-blur-md">
             <h2 className="text-2xl font-bold tracking-tight text-zinc-100">
               With Oathbound
             </h2>
