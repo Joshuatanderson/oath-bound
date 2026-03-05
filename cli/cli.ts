@@ -3,11 +3,15 @@
 import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync, readFileSync, unlinkSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
-import { tmpdir } from 'node:os';
+import {
+  writeFileSync, readFileSync, unlinkSync, existsSync,
+  readdirSync, statSync, mkdirSync, renameSync, chmodSync,
+} from 'node:fs';
+import { join, relative, dirname } from 'node:path';
+import { tmpdir, homedir, platform } from 'node:os';
+import { intro, outro, select, cancel, isCancel } from '@clack/prompts';
 
-const VERSION = '0.1.2';
+const VERSION = '0.2.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -18,6 +22,7 @@ const USE_COLOR = process.env.NO_COLOR === undefined && process.stderr.isTTY;
 const TEAL = USE_COLOR ? '\x1b[38;2;63;168;164m' : ''; // brand teal #3fa8a4
 const GREEN = USE_COLOR ? '\x1b[32m' : '';
 const RED = USE_COLOR ? '\x1b[31m' : '';
+const YELLOW = USE_COLOR ? '\x1b[33m' : '';
 const DIM = USE_COLOR ? '\x1b[2m' : '';
 const BOLD = USE_COLOR ? '\x1b[1m' : '';
 const RESET = USE_COLOR ? '\x1b[0m' : '';
@@ -37,6 +42,7 @@ function usage(exitCode = 1): never {
 ${BOLD}oathbound${RESET} — install and verify skills
 
 ${DIM}Usage:${RESET}
+  oathbound init                ${DIM}Setup wizard — configure project${RESET}
   oathbound pull <namespace/skill-name>
   oathbound install <namespace/skill-name>
   oathbound verify              ${DIM}SessionStart hook — verify all skills${RESET}
@@ -160,6 +166,278 @@ function hashSkillDir(skillDir: string): string {
   return contentHash(files);
 }
 
+// --- JSONC / Config helpers ---
+type EnforcementLevel = 'warn' | 'registered' | 'audited';
+
+/** Strip // line comments from JSONC, preserving // inside strings. */
+export function stripJsoncComments(text: string): string {
+  let result = '';
+  let i = 0;
+  while (i < text.length) {
+    // String literal — copy through, respecting escapes
+    if (text[i] === '"') {
+      result += '"';
+      i++;
+      while (i < text.length && text[i] !== '"') {
+        if (text[i] === '\\') { result += text[i++]; } // escape char
+        if (i < text.length) { result += text[i++]; }
+      }
+      if (i < text.length) { result += text[i++]; } // closing "
+      continue;
+    }
+    // Line comment
+    if (text[i] === '/' && text[i + 1] === '/') {
+      while (i < text.length && text[i] !== '\n') i++;
+      continue;
+    }
+    result += text[i++];
+  }
+  return result;
+}
+
+export function readOathboundConfig(): { enforcement: EnforcementLevel } | null {
+  const configPath = join(process.cwd(), '.oathbound.jsonc');
+  if (!existsSync(configPath)) return null;
+  try {
+    const raw = readFileSync(configPath, 'utf-8');
+    const parsed = JSON.parse(stripJsoncComments(raw));
+    const level = parsed.enforcement;
+    if (level === 'warn' || level === 'registered' || level === 'audited') {
+      return { enforcement: level };
+    }
+    return { enforcement: 'warn' };
+  } catch {
+    return null;
+  }
+}
+
+// --- Auto-update helpers ---
+export function isNewer(remote: string, local: string): boolean {
+  const parse = (v: string) => v.replace(/^v/, '').split('.').map(Number);
+  const [rMaj, rMin, rPat] = parse(remote);
+  const [lMaj, lMin, lPat] = parse(local);
+  if (rMaj !== lMaj) return rMaj > lMaj;
+  if (rMin !== lMin) return rMin > lMin;
+  return rPat > lPat;
+}
+
+function getCacheDir(): string {
+  if (platform() === 'darwin') {
+    return join(homedir(), 'Library', 'Caches', 'oathbound');
+  }
+  return join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'oathbound');
+}
+
+function getPlatformBinaryName(): string {
+  const os = platform() === 'darwin' ? 'macos' : 'linux';
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  return `oathbound-${os}-${arch}`;
+}
+
+function printUpdateBox(current: string, latest: string): void {
+  const line = `Update available: ${current} → ${latest}`;
+  const install = 'Run: npm install -g oathbound';
+  const width = Math.max(line.length, install.length) + 2;
+  const pad = (s: string) => s + ' '.repeat(width - s.length);
+  process.stderr.write(`\n${TEAL}┌${'─'.repeat(width)}┐${RESET}\n`);
+  process.stderr.write(`${TEAL}│${RESET} ${pad(line)}${TEAL}│${RESET}\n`);
+  process.stderr.write(`${TEAL}│${RESET} ${pad(install)}${TEAL}│${RESET}\n`);
+  process.stderr.write(`${TEAL}└${'─'.repeat(width)}┘${RESET}\n`);
+}
+
+async function checkForUpdate(): Promise<void> {
+  const cacheDir = getCacheDir();
+  const cacheFile = join(cacheDir, 'update-check.json');
+
+  // Check cache freshness (24h)
+  if (existsSync(cacheFile)) {
+    try {
+      const cache = JSON.parse(readFileSync(cacheFile, 'utf-8'));
+      if (Date.now() - cache.checkedAt < 86_400_000) {
+        if (cache.latestVersion && isNewer(cache.latestVersion, VERSION)) {
+          printUpdateBox(VERSION, cache.latestVersion);
+        }
+        return;
+      }
+    } catch { /* stale cache, re-check */ }
+  }
+
+  // Fetch latest version from npm
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const resp = await fetch(
+      'https://registry.npmjs.org/oathbound?fields=dist-tags',
+      { signal: controller.signal },
+    );
+    clearTimeout(timeout);
+    if (!resp.ok) return;
+    const data = await resp.json() as { 'dist-tags'?: { latest?: string } };
+    const latest = data['dist-tags']?.latest;
+    if (!latest) return;
+
+    // Write cache
+    mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(cacheFile, JSON.stringify({ checkedAt: Date.now(), latestVersion: latest }));
+
+    if (!isNewer(latest, VERSION)) return;
+
+    // Try auto-update the binary
+    const binaryPath = process.argv[0];
+    if (!binaryPath || binaryPath.includes('bun') || binaryPath.includes('node')) {
+      // Running via bun/node, not compiled binary — just print box
+      printUpdateBox(VERSION, latest);
+      return;
+    }
+
+    const binaryName = getPlatformBinaryName();
+    const url = `https://github.com/Joshuatanderson/oath-bound/releases/download/v${latest}/${binaryName}`;
+    const dlController = new AbortController();
+    const dlTimeout = setTimeout(() => dlController.abort(), 30_000);
+    const dlResp = await fetch(url, { signal: dlController.signal, redirect: 'follow' });
+    clearTimeout(dlTimeout);
+
+    if (!dlResp.ok || !dlResp.body) {
+      printUpdateBox(VERSION, latest);
+      return;
+    }
+
+    const bytes = Buffer.from(await dlResp.arrayBuffer());
+    const tmpPath = `${binaryPath}.update-${Date.now()}`;
+    writeFileSync(tmpPath, bytes);
+    chmodSync(tmpPath, 0o755);
+    renameSync(tmpPath, binaryPath);
+    process.stderr.write(`${TEAL} ✓ Updated oathbound ${VERSION} → ${latest}${RESET}\n`);
+  } catch {
+    // Network error or permission issue — silently ignore
+    // The next run will retry
+  }
+}
+
+// --- Init helpers ---
+export function writeOathboundConfig(enforcement: EnforcementLevel): boolean {
+  const configPath = join(process.cwd(), '.oathbound.jsonc');
+  if (existsSync(configPath)) return false;
+  const content = `// Oathbound project configuration
+// Docs: https://oathbound.ai/docs/config
+{
+  "$schema": "https://oathbound.ai/schemas/config-v1.json",
+  "version": 1,
+  "enforcement": "${enforcement}",
+  "org": null
+}
+`;
+  writeFileSync(configPath, content);
+  return true;
+}
+
+const OATHBOUND_HOOKS = {
+  SessionStart: [
+    { matcher: '', hooks: [{ type: 'command', command: 'oathbound verify' }] },
+  ],
+  PreToolUse: [
+    { matcher: 'Skill', hooks: [{ type: 'command', command: 'oathbound verify --check' }] },
+  ],
+};
+
+function hasOathboundHooks(settings: Record<string, unknown>): boolean {
+  const hooks = settings.hooks as Record<string, unknown[]> | undefined;
+  if (!hooks) return false;
+  for (const entries of Object.values(hooks)) {
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      const e = entry as Record<string, unknown>;
+      const innerHooks = e.hooks as Array<Record<string, unknown>> | undefined;
+      if (!innerHooks) continue;
+      for (const h of innerHooks) {
+        if (typeof h.command === 'string' && h.command.startsWith('oathbound')) return true;
+      }
+    }
+  }
+  return false;
+}
+
+export type MergeResult = 'created' | 'merged' | 'skipped' | 'malformed';
+
+export function mergeClaudeSettings(): MergeResult {
+  const claudeDir = join(process.cwd(), '.claude');
+  const settingsPath = join(claudeDir, 'settings.json');
+
+  if (!existsSync(settingsPath)) {
+    mkdirSync(claudeDir, { recursive: true });
+    writeFileSync(settingsPath, JSON.stringify({ hooks: OATHBOUND_HOOKS }, null, 2) + '\n');
+    return 'created';
+  }
+
+  let settings: Record<string, unknown>;
+  try {
+    settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+  } catch {
+    return 'malformed';
+  }
+
+  if (hasOathboundHooks(settings)) return 'skipped';
+
+  // Merge hooks into existing settings
+  const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
+  for (const [event, entries] of Object.entries(OATHBOUND_HOOKS)) {
+    const existing = hooks[event] as unknown[] | undefined;
+    hooks[event] = existing ? [...existing, ...entries] : [...entries];
+  }
+  settings.hooks = hooks;
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+  return 'merged';
+}
+
+// --- Init command ---
+async function init(): Promise<void> {
+  intro(`${TEAL}${BOLD} oathbound init ${RESET}`);
+
+  const enforcement = await select({
+    message: 'Choose an enforcement level:',
+    options: [
+      { value: 'warn', label: 'Warn', hint: 'Report unverified skills but allow them' },
+      { value: 'registered', label: 'Registered', hint: 'Block unregistered skills' },
+      { value: 'audited', label: 'Audited', hint: 'Block skills without a passed audit' },
+    ],
+  });
+
+  if (isCancel(enforcement)) {
+    cancel('Setup cancelled.');
+    process.exit(0);
+  }
+
+  const level = enforcement as EnforcementLevel;
+
+  // Write .oathbound.jsonc
+  const configWritten = writeOathboundConfig(level);
+  if (configWritten) {
+    process.stderr.write(`${GREEN} ✓ Created .oathbound.jsonc${RESET}\n`);
+  } else {
+    process.stderr.write(`${DIM}   .oathbound.jsonc already exists — skipped${RESET}\n`);
+  }
+
+  // Merge hooks into .claude/settings.json
+  const mergeResult = mergeClaudeSettings();
+  switch (mergeResult) {
+    case 'created':
+      process.stderr.write(`${GREEN} ✓ Created .claude/settings.json with hooks${RESET}\n`);
+      break;
+    case 'merged':
+      process.stderr.write(`${GREEN} ✓ Added hooks to .claude/settings.json${RESET}\n`);
+      break;
+    case 'skipped':
+      process.stderr.write(`${DIM}   .claude/settings.json already has oathbound hooks — skipped${RESET}\n`);
+      break;
+    case 'malformed':
+      process.stderr.write(`${RED} ✗ .claude/settings.json is malformed JSON — skipped${RESET}\n`);
+      process.stderr.write(`${RED}   Please fix the file manually and re-run oathbound init${RESET}\n`);
+      break;
+  }
+
+  outro(`${TEAL}${BOLD} oathbound configured (${level}) ${RESET}`);
+}
+
 // --- Session state file ---
 interface SessionState {
   verified: Record<string, string>; // skill name → content_hash
@@ -223,11 +501,19 @@ async function verify(): Promise<void> {
     localHashes[dir.name] = hashSkillDir(fullPath);
   }
 
+  // Read enforcement config
+  const config = readOathboundConfig();
+  const enforcement: EnforcementLevel = config?.enforcement ?? 'warn';
+
   // Fetch registry hashes from Supabase (latest version per skill name)
+  // If enforcement=audited, also fetch audit status
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const selectFields = enforcement === 'audited'
+    ? 'name, namespace, content_hash, version, audits(passed)'
+    : 'name, namespace, content_hash, version';
   const { data: skills, error } = await supabase
     .from('skills')
-    .select('name, namespace, content_hash, version')
+    .select(selectFields)
     .order('version', { ascending: false });
 
   if (error) {
@@ -237,24 +523,45 @@ async function verify(): Promise<void> {
 
   // Build lookup: skill name → latest content_hash (dedupe by taking first per name)
   const registryHashes = new Map<string, string>();
+  const auditedSkills = new Set<string>(); // skills with at least one passed audit
   for (const skill of skills ?? []) {
     if (!skill.content_hash) continue;
     if (!registryHashes.has(skill.name)) {
       registryHashes.set(skill.name, skill.content_hash);
     }
+    if (enforcement === 'audited') {
+      const audits = (skill as Record<string, unknown>).audits as Array<{ passed: boolean }> | null;
+      if (audits?.some((a) => a.passed)) {
+        auditedSkills.add(skill.name);
+      }
+    }
   }
 
   const verified: Record<string, string> = {};
   const rejected: { name: string; reason: string }[] = [];
+  const warnings: { name: string; reason: string }[] = [];
 
   for (const [name, localHash] of Object.entries(localHashes)) {
     const registryHash = registryHashes.get(name);
     if (!registryHash) {
       process.stderr.write(`${DIM}   ${name}: ${localHash} (not in registry)${RESET}\n`);
-      rejected.push({ name, reason: 'not in registry' });
+      if (enforcement === 'warn') {
+        warnings.push({ name, reason: 'not in registry' });
+        verified[name] = localHash; // allow in warn mode
+      } else {
+        rejected.push({ name, reason: 'not in registry' });
+      }
     } else if (localHash !== registryHash) {
       process.stderr.write(`${RED}   ${name}: ${localHash} ≠ ${registryHash}${RESET}\n`);
-      rejected.push({ name, reason: `content hash mismatch (local: ${localHash.slice(0, 8)}…, registry: ${registryHash.slice(0, 8)}…)` });
+      if (enforcement === 'warn') {
+        warnings.push({ name, reason: `content hash mismatch (local: ${localHash.slice(0, 8)}…, registry: ${registryHash.slice(0, 8)}…)` });
+        verified[name] = localHash;
+      } else {
+        rejected.push({ name, reason: `content hash mismatch (local: ${localHash.slice(0, 8)}…, registry: ${registryHash.slice(0, 8)}…)` });
+      }
+    } else if (enforcement === 'audited' && !auditedSkills.has(name)) {
+      process.stderr.write(`${YELLOW}   ${name}: ${localHash} (registered but not audited)${RESET}\n`);
+      rejected.push({ name, reason: 'no passed audit' });
     } else {
       process.stderr.write(`${GREEN}   ${name}: ${localHash} ✓${RESET}\n`);
       verified[name] = localHash;
@@ -265,7 +572,7 @@ async function verify(): Promise<void> {
   const state: SessionState = { verified, rejected, ok };
   writeFileSync(sessionStatePath(sessionId), JSON.stringify(state));
 
-  if (ok) {
+  if (ok && warnings.length === 0) {
     const names = Object.keys(verified).join(', ');
     console.log(JSON.stringify({
       hookSpecificOutput: {
@@ -274,9 +581,21 @@ async function verify(): Promise<void> {
       },
     }));
     process.exit(0);
+  } else if (ok && warnings.length > 0) {
+    // Warn mode — all skills allowed but with warnings
+    const warnLines = warnings.map((w) => `  ⚠ ${w.name}: ${w.reason}`).join('\n');
+    const names = Object.keys(verified).join(', ');
+    process.stderr.write(`${YELLOW}Oathbound warnings (enforcement: warn):\n${warnLines}${RESET}\n`);
+    console.log(JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'SessionStart',
+        additionalContext: `Oathbound (warn mode): ${Object.keys(verified).length} skill(s) allowed [${names}]. Warnings:\n${warnLines}`,
+      },
+    }));
+    process.exit(0);
   } else {
     const lines = rejected.map((r) => `  - ${r.name}: ${r.reason}`);
-    process.stderr.write(`Oathbound: skill verification failed!\n${lines.join('\n')}\nDo NOT use unverified skills.\n`);
+    process.stderr.write(`Oathbound: skill verification failed! (enforcement: ${enforcement})\n${lines.join('\n')}\nDo NOT use unverified skills.\n`);
     process.exit(2);
   }
 }
@@ -439,6 +758,9 @@ async function pull(skillArg: string): Promise<void> {
 }
 
 // --- Entry ---
+if (!import.meta.main) {
+  // Module imported for testing — skip CLI entry
+} else {
 const args = Bun.argv.slice(2);
 const subcommand = args[0];
 
@@ -451,7 +773,17 @@ if (subcommand === '--version' || subcommand === '-v') {
   process.exit(0);
 }
 
-if (subcommand === 'verify') {
+// Fire-and-forget auto-update on every command except verify (hooks must be fast)
+if (subcommand !== 'verify') {
+  checkForUpdate().catch(() => {});
+}
+
+if (subcommand === 'init') {
+  init().catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    fail('Init failed', msg);
+  });
+} else if (subcommand === 'verify') {
   const isCheck = args.includes('--check');
   const run = isCheck ? verifyCheck : verify;
   run().catch((err: unknown) => {
@@ -472,3 +804,4 @@ if (subcommand === 'verify') {
     fail('Unexpected error', msg);
   });
 }
+} // end if (import.meta.main)
