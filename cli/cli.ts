@@ -229,9 +229,11 @@ function getCacheDir(): string {
 }
 
 function getPlatformBinaryName(): string {
-  const os = platform() === 'darwin' ? 'macos' : 'linux';
+  const p = platform();
+  const os = p === 'win32' ? 'windows' : p === 'darwin' ? 'darwin' : 'linux';
   const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
-  return `oathbound-${os}-${arch}`;
+  const ext = p === 'win32' ? '.exe' : '';
+  return `oathbound-${os}-${arch}${ext}`;
 }
 
 function printUpdateBox(current: string, latest: string): void {
