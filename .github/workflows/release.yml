@@ -2,8 +2,8 @@ name: Release CLI
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+    paths: ['cli/**']
 
 permissions:
   contents: write
@@ -15,18 +15,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read version from cli.ts
+        id: version
+        run: |
+          VERSION=$(grep "^const VERSION" cli/cli.ts | sed "s/.*'\(.*\)'.*/\1/")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check if release already exists
+        id: check
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" &>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - uses: oven-sh/setup-bun@v2
+        if: steps.check.outputs.exists == 'false'
         with:
           bun-version: latest
 
       - run: bun install --frozen-lockfile
+        if: steps.check.outputs.exists == 'false'
         working-directory: cli
 
       - name: Run tests
+        if: steps.check.outputs.exists == 'false'
         working-directory: cli
         run: bun test
 
       - name: Build binaries
+        if: steps.check.outputs.exists == 'false'
         working-directory: cli
         run: |
           mkdir -p dist
@@ -37,9 +59,19 @@ jobs:
           bun build ./cli.ts --compile --target=bun-windows-x64 --outfile dist/oathbound-windows-x64.exe
           bun build ./cli.ts --compile --target=bun-windows-arm64 --outfile dist/oathbound-windows-arm64.exe
 
+      - name: Create tag and release
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
           files: cli/dist/*
           generate_release_notes: true
 

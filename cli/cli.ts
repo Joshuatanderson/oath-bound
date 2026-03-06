@@ -11,7 +11,7 @@ import { join, relative, dirname } from 'node:path';
 import { tmpdir, homedir, platform } from 'node:os';
 import { intro, outro, select, cancel, isCancel } from '@clack/prompts';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -26,6 +26,8 @@ const YELLOW = USE_COLOR ? '\x1b[33m' : '';
 const DIM = USE_COLOR ? '\x1b[2m' : '';
 const BOLD = USE_COLOR ? '\x1b[1m' : '';
 const RESET = USE_COLOR ? '\x1b[0m' : '';
+
+const BRAND = `${TEAL}${BOLD}🛡️ oathbound${RESET}`;
 
 // --- Types ---
 interface SkillRow {
@@ -393,7 +395,7 @@ export function mergeClaudeSettings(): MergeResult {
 
 // --- Init command ---
 async function init(): Promise<void> {
-  intro(`${TEAL}${BOLD} oathbound init ${RESET}`);
+  intro(BRAND);
 
   const enforcement = await select({
     message: 'Choose an enforcement level:',
@@ -437,7 +439,7 @@ async function init(): Promise<void> {
       break;
   }
 
-  outro(`${TEAL}${BOLD} oathbound configured (${level}) ${RESET}`);
+  outro(`${BRAND} ${TEAL}configured (${level})${RESET}`);
 }
 
 // --- Session state file ---
@@ -542,6 +544,8 @@ async function verify(): Promise<void> {
   const verified: Record<string, string> = {};
   const rejected: { name: string; reason: string }[] = [];
   const warnings: { name: string; reason: string }[] = [];
+
+  process.stderr.write(`${BRAND} ${TEAL}verifying skills...${RESET}\n`);
 
   for (const [name, localHash] of Object.entries(localHashes)) {
     const registryHash = registryHashes.get(name);
@@ -691,7 +695,7 @@ async function pull(skillArg: string): Promise<void> {
   const { namespace, name } = parsed;
   const fullName = `${namespace}/${name}`;
 
-  console.log(`\n${TEAL} ↓ Pulling ${fullName}...${RESET}`);
+  console.log(`\n${BRAND} ${TEAL}↓ Pulling ${fullName}...${RESET}`);
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
