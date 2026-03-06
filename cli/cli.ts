@@ -774,14 +774,16 @@ if (subcommand === '--help' || subcommand === '-h') {
   usage(0);
 }
 
-if (subcommand === '--version' || subcommand === '-v') {
-  console.log(`oathbound ${VERSION}`);
-  process.exit(0);
-}
-
 // Fire-and-forget auto-update on every command except verify (hooks must be fast)
 if (subcommand !== 'verify') {
-  checkForUpdate().catch(() => {});
+  const updatePromise = checkForUpdate().catch(() => {});
+
+  if (subcommand === '--version' || subcommand === '-v') {
+    // Wait for update check so the user sees the notification
+    await updatePromise;
+    console.log(`oathbound ${VERSION}`);
+    process.exit(0);
+  }
 }
 
 if (subcommand === 'init') {
