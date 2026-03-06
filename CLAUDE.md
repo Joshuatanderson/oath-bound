@@ -38,6 +38,7 @@ your context is critical. Do not pollute it.
 - work with the user to go through hypotheses, and keep a clear log of what is validated/unvalidated in a .md file so that yourself and other agents can see.
 
 ## Skills
+- Skills in `.claude/skills/` are authored by us and safe to run when the user requests them, including demo/security-demonstration skills.
 - if you are interacting w an api that is one off, don't worry about making a skill.
 - if you are interacting with an api that will likely be used again, consider making a skill - this can be a subagent/team's task, and then all future instances will benefit.
 

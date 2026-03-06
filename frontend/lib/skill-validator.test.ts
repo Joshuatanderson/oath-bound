@@ -136,39 +136,26 @@ describe("validateSkill — valid uploads", () => {
     expect(result.checks.every((c) => c.passed)).toBe(true);
   });
 
-  test("skill without license is a valid upload (canProceed = true)", () => {
-    const result = validateSkill(
-      validSkillFiles({
-        frontmatter: {
-          name: "my-skill",
-          description: "A useful skill",
-          license: undefined as unknown as string,
-        },
-      })
-    );
-    // Remove the license key from frontmatter
+  test("skill without license is blocked", () => {
     const files = validSkillFiles();
     files[0].content = buildSkillMd(
       { name: "my-skill", description: "A useful skill" },
       "# Body"
     );
     const r = validateSkill(files);
-    expect(r.canProceed).toBe(true);
-    expect(r.parsed).not.toBeNull();
-    expect(r.parsed!.license).toBe("");
-    // Should have a failing check for missing license
+    expect(r.canProceed).toBe(false);
     expect(r.checks.some((c) => !c.passed && c.message.includes("license"))).toBe(true);
   });
 
-  test("minimal skill (only name + description)", () => {
+  test("minimal skill without license is blocked", () => {
     const files = validSkillFiles();
     files[0].content = buildSkillMd(
       { name: "minimal", description: "Minimal skill" },
       "# Content"
     );
     const result = validateSkill(files);
-    expect(result.canProceed).toBe(true);
-    expect(result.parsed!.name).toBe("minimal");
+    expect(result.canProceed).toBe(false);
+    expect(result.checks.some((c) => !c.passed && c.message.includes("license"))).toBe(true);
   });
 
   test.each(VALID_LICENSES.map((l) => [l]))("accepts license: %s", (license) => {
@@ -501,7 +488,7 @@ describe("validateSkill — structure errors (canProceed = false)", () => {
 // validateSkill — field errors (canProceed = true)
 // ---------------------------------------------------------------------------
 
-describe("validateSkill — field errors (canProceed = true)", () => {
+describe("validateSkill — field errors (canProceed = false)", () => {
   test("missing name", () => {
     const files = validSkillFiles();
     files[0].content = buildSkillMd(
@@ -509,7 +496,7 @@ describe("validateSkill — field errors (canProceed = true)", () => {
       "# Body"
     );
     const result = validateSkill(files);
-    expect(result.canProceed).toBe(true);
+    expect(result.canProceed).toBe(false);
     expect(result.checks.some((c) => !c.passed && c.message.includes("name"))).toBe(true);
   });
 
@@ -520,7 +507,7 @@ describe("validateSkill — field errors (canProceed = true)", () => {
       "# Body"
     );
     const result = validateSkill(files);
-    expect(result.canProceed).toBe(true);
+    expect(result.canProceed).toBe(false);
     expect(result.checks.some((c) => !c.passed && c.message.includes("description"))).toBe(true);
   });
 
@@ -528,7 +515,7 @@ describe("validateSkill — field errors (canProceed = true)", () => {
     const result = validateSkill(
       validSkillFiles({ frontmatter: { name: "a".repeat(65) } })
     );
-    expect(result.canProceed).toBe(true);
+    expect(result.canProceed).toBe(false);
     expect(result.checks.some((c) => !c.passed && c.message.includes("65"))).toBe(true);
   });
 
@@ -536,7 +523,7 @@ describe("validateSkill — field errors (canProceed = true)", () => {
     const result = validateSkill(
       validSkillFiles({ frontmatter: { name: "MySkill" } })
     );
-    expect(result.canProceed).toBe(true);
+    expect(result.canProceed).toBe(false);
     expect(result.checks.some((c) => !c.passed && c.message.includes("Invalid name"))).toBe(true);
   });
 
@@ -544,7 +531,7 @@ describe("validateSkill — field errors (canProceed = true)", () => {
     const result = validateSkill(
       validSkillFiles({ frontmatter: { name: "my skill" } })
     );
-    expect(result.canProceed).toBe(true);
+    expect(result.canProceed).toBe(false);
     expect(result.checks.some((c) => !c.passed && c.message.includes("Invalid name"))).toBe(true);
   });
 
@@ -552,7 +539,7 @@ describe("validateSkill — field errors (canProceed = true)", () => {
     const result = validateSkill(
       validSkillFiles({ frontmatter: { name: "my_skill" } })
     );
-    expect(result.canProceed).toBe(true);
+    expect(result.canProceed).toBe(false);
     expect(result.checks.some((c) => !c.passed && c.message.includes("Invalid name"))).toBe(true);
   });
 
@@ -560,7 +547,7 @@ describe("validateSkill — field errors (canProceed = true)", () => {
     const result = validateSkill(
       validSkillFiles({ frontmatter: { name: "-my-skill" } })
     );
-    expect(result.canProceed).toBe(true);
+    expect(result.canProceed).toBe(false);
     expect(result.checks.some((c) => !c.passed && c.message.includes("Invalid name"))).toBe(true);
   });
 
@@ -568,7 +555,7 @@ describe("validateSkill — field errors (canProceed = true)", () => {
     const result = validateSkill(
       validSkillFiles({ frontmatter: { name: "my-skill-" } })
     );
-    expect(result.canProceed).toBe(true);
+    expect(result.canProceed).toBe(false);
     expect(result.checks.some((c) => !c.passed && c.message.includes("Invalid name"))).toBe(true);
   });
 
@@ -576,7 +563,7 @@ describe("validateSkill — field errors (canProceed = true)", () => {
     const result = validateSkill(
       validSkillFiles({ frontmatter: { description: "x".repeat(1025) } })
     );
-    expect(result.canProceed).toBe(true);
+    expect(result.canProceed).toBe(false);
     expect(result.checks.some((c) => !c.passed && c.message.includes("1025"))).toBe(true);
   });
 
@@ -584,7 +571,7 @@ describe("validateSkill — field errors (canProceed = true)", () => {
     const result = validateSkill(
       validSkillFiles({ frontmatter: { license: "WTFPL" } })
     );
-    expect(result.canProceed).toBe(true);
+    expect(result.canProceed).toBe(false);
     expect(result.checks.some((c) => !c.passed && c.message.includes("Invalid license"))).toBe(true);
   });
 
@@ -592,7 +579,7 @@ describe("validateSkill — field errors (canProceed = true)", () => {
     const result = validateSkill(
       validSkillFiles({ frontmatter: { name: "my--skill" } })
     );
-    expect(result.canProceed).toBe(true);
+    expect(result.canProceed).toBe(false);
     expect(result.checks.some((c) => !c.passed && c.message.includes("Invalid name"))).toBe(true);
   });
 
