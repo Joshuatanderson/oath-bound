@@ -1,6 +1,6 @@
 {
   "name": "oathbound",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Install verified Claude Code skills from the Oath Bound registry",
   "license": "BUSL-1.1",
   "author": "Josh Anderson",

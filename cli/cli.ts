@@ -11,7 +11,7 @@ import { join, relative, dirname } from 'node:path';
 import { tmpdir, homedir, platform } from 'node:os';
 import { intro, outro, select, cancel, isCancel } from '@clack/prompts';
 
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
