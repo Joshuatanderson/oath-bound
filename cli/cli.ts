@@ -11,7 +11,7 @@ import { join, relative, dirname } from 'node:path';
 import { tmpdir, homedir, platform } from 'node:os';
 import { intro, outro, select, cancel, isCancel } from '@clack/prompts';
 
-const VERSION = '0.3.1';
+const VERSION = '0.4.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -335,12 +335,18 @@ export function writeOathboundConfig(enforcement: EnforcementLevel): boolean {
   return true;
 }
 
+const SKILL_CHECK = { type: 'command', command: 'oathbound verify --check' };
+
 const OATHBOUND_HOOKS = {
   SessionStart: [
     { matcher: '', hooks: [{ type: 'command', command: 'oathbound verify' }] },
   ],
   PreToolUse: [
-    { matcher: 'Skill', hooks: [{ type: 'command', command: 'oathbound verify --check' }] },
+    { matcher: 'Skill', hooks: [SKILL_CHECK] },
+    { matcher: 'Bash', hooks: [SKILL_CHECK] },
+    { matcher: 'Read', hooks: [SKILL_CHECK] },
+    { matcher: 'Glob', hooks: [SKILL_CHECK] },
+    { matcher: 'Grep', hooks: [SKILL_CHECK] },
   ],
 };
 
@@ -607,6 +613,38 @@ async function verify(): Promise<void> {
 }
 
 // --- Verify --check (PreToolUse hook) ---
+
+/** Extract skill name from a file path if it references .claude/skills/<name>/... */
+function skillNameFromPath(filePath: string): string | null {
+  const marker = '.claude/skills/';
+  const idx = filePath.indexOf(marker);
+  if (idx === -1) return null;
+  const rest = filePath.slice(idx + marker.length);
+  const name = rest.split('/')[0];
+  return name || null;
+}
+
+/** Extract skill name from a bash command if it references .claude/skills/<name>/... */
+function skillNameFromCommand(command: string): string | null {
+  const marker = '.claude/skills/';
+  const idx = command.indexOf(marker);
+  if (idx === -1) return null;
+  const rest = command.slice(idx + marker.length);
+  const name = rest.split(/[\/\s'"]/)[0];
+  return name || null;
+}
+
+function denySkill(reason: string): never {
+  console.log(JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: reason,
+    },
+  }));
+  process.exit(0);
+}
+
 async function verifyCheck(): Promise<void> {
   let input: Record<string, unknown>;
   try {
@@ -616,18 +654,34 @@ async function verifyCheck(): Promise<void> {
     process.exit(1);
   }
   const sessionId: string = input.session_id as string;
-  const skillName: string | undefined = (input.tool_input as Record<string, unknown> | undefined)?.skill as string | undefined;
+  const toolName: string = (input.tool_name as string) ?? '';
+  const toolInput = (input.tool_input as Record<string, unknown>) ?? {};
 
-  if (!sessionId || !skillName) {
-    // Can't verify — allow through (non-skill invocation or missing context)
-    process.exit(0);
+  if (!sessionId) process.exit(0);
+
+  // Extract skill name based on which tool triggered the hook
+  let baseName: string | null = null;
+
+  if (toolName === 'Skill') {
+    const skill = toolInput.skill as string | undefined;
+    if (!skill) process.exit(0);
+    baseName = skill.includes(':') ? skill.split(':').pop()! : skill;
+  } else if (toolName === 'Bash') {
+    baseName = skillNameFromCommand((toolInput.command as string) ?? '');
+  } else if (toolName === 'Read') {
+    baseName = skillNameFromPath((toolInput.file_path as string) ?? '');
+  } else if (toolName === 'Glob' || toolName === 'Grep') {
+    baseName = skillNameFromPath((toolInput.path as string) ?? '');
+    // Also check pattern/glob fields for skill path references
+    if (!baseName) baseName = skillNameFromPath((toolInput.pattern as string) ?? '');
+    if (!baseName) baseName = skillNameFromPath((toolInput.glob as string) ?? '');
   }
+
+  // Not a skill-related operation — allow through
+  if (!baseName) process.exit(0);
 
   const stateFile = sessionStatePath(sessionId);
-  if (!existsSync(stateFile)) {
-    // No session state — session start hook didn't run or no skills installed
-    process.exit(0);
-  }
+  if (!existsSync(stateFile)) process.exit(0);
 
   let state: SessionState;
   try {
@@ -637,22 +691,12 @@ async function verifyCheck(): Promise<void> {
     process.exit(1);
   }
 
-  // Extract just the skill name (strip namespace/ prefix if present)
-  const baseName = skillName.includes(':') ? skillName.split(':').pop()! : skillName;
-
   // Find the skill directory and re-hash
   const skillsDir = findSkillsDir();
   const skillDir = join(skillsDir, baseName);
 
   if (!existsSync(skillDir) || !statSync(skillDir).isDirectory()) {
-    console.log(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: 'deny',
-        permissionDecisionReason: `Oathbound: skill directory not found for "${baseName}"`,
-      },
-    }));
-    process.exit(0);
+    denySkill(`Oathbound: skill directory not found for "${baseName}"`);
   }
 
   const currentHash = hashSkillDir(skillDir);
@@ -660,26 +704,12 @@ async function verifyCheck(): Promise<void> {
 
   if (!sessionHash) {
     process.stderr.write(`${RED}   ${baseName}: ${currentHash} (not verified at session start)${RESET}\n`);
-    console.log(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: 'deny',
-        permissionDecisionReason: `Oathbound: skill "${baseName}" was not verified at session start`,
-      },
-    }));
-    process.exit(0);
+    denySkill(`Oathbound: skill "${baseName}" was not verified at session start`);
   }
 
   if (currentHash !== sessionHash) {
     process.stderr.write(`${RED}   ${baseName}: ${currentHash} ≠ ${sessionHash} (tampered)${RESET}\n`);
-    console.log(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: 'deny',
-        permissionDecisionReason: `Oathbound: skill "${baseName}" was modified since session start (tampering detected)`,
-      },
-    }));
-    process.exit(0);
+    denySkill(`Oathbound: skill "${baseName}" was modified since session start (tampering detected)`);
   }
 
   process.stderr.write(`${GREEN}   ${baseName}: ${currentHash} ✓${RESET}\n`);
