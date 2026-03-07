@@ -134,9 +134,9 @@ describe('mergeClaudeSettings', () => {
 
     const settings = JSON.parse(readFileSync(join(tmpDir, '.claude', 'settings.json'), 'utf-8'));
     expect(settings.hooks.SessionStart).toHaveLength(1);
-    expect(settings.hooks.PreToolUse).toHaveLength(1);
+    expect(settings.hooks.PreToolUse).toHaveLength(5);
     expect(settings.hooks.SessionStart[0].hooks[0].command).toBe('oathbound verify');
-    expect(settings.hooks.PreToolUse[0].matcher).toBe('Skill');
+    expect(settings.hooks.PreToolUse.map((e: { matcher: string }) => e.matcher)).toEqual(['Skill', 'Bash', 'Read', 'Glob', 'Grep']);
   });
 
   test('merges without clobbering existing hooks', () => {
@@ -160,7 +160,7 @@ describe('mergeClaudeSettings', () => {
     expect(settings.hooks.SessionStart[0].hooks[0].command).toBe('echo hello');
     // Oathbound hooks added
     expect(settings.hooks.SessionStart[1].hooks[0].command).toBe('oathbound verify');
-    expect(settings.hooks.PreToolUse).toHaveLength(1);
+    expect(settings.hooks.PreToolUse).toHaveLength(5);
     // Other keys preserved
     expect(settings.someOtherKey).toBe(true);
   });
