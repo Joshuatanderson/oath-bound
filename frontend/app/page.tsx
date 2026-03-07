@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import ScaleHero from "@/components/scale-hero";
+import { CopyCommand } from "@/components/copy-command";
 
 const rows: {
   bad: { icon: LucideIcon; text: string };
@@ -69,6 +70,9 @@ export default function Home() {
               <Button asChild variant="outline" size="lg">
                 <Link href="/skills">View skills</Link>
               </Button>
+            </div>
+            <div className="w-full max-w-sm pt-6">
+              <CopyCommand command="npx oathbound init" />
             </div>
           </div>
         </div>
