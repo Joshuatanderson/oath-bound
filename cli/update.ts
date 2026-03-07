@@ -45,11 +45,11 @@ export async function checkForUpdate(version: string): Promise<void> {
   const cacheDir = getCacheDir();
   const cacheFile = join(cacheDir, 'update-check.json');
 
-  // Check cache freshness (24h)
+  // Check cache freshness (24h) — invalidate if local version changed
   if (existsSync(cacheFile)) {
     try {
       const cache = JSON.parse(readFileSync(cacheFile, 'utf-8'));
-      if (Date.now() - cache.checkedAt < 86_400_000) {
+      if (cache.localVersion === version && Date.now() - cache.checkedAt < 86_400_000) {
         if (cache.latestVersion && isNewer(cache.latestVersion, version)) {
           printUpdateBox(version, cache.latestVersion);
         }
@@ -74,7 +74,7 @@ export async function checkForUpdate(version: string): Promise<void> {
 
     // Write cache
     mkdirSync(cacheDir, { recursive: true });
-    writeFileSync(cacheFile, JSON.stringify({ checkedAt: Date.now(), latestVersion: latest }));
+    writeFileSync(cacheFile, JSON.stringify({ checkedAt: Date.now(), latestVersion: latest, localVersion: version }));
 
     if (!isNewer(latest, version)) return;
 
