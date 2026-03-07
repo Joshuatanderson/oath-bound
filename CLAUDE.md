@@ -43,3 +43,9 @@ your context is critical. Do not pollute it.
 
 ## Context for deployment
 - you are deployed at oathbound.ai
+
+## Error handling
+DO NOT silently swallow errors. This is an extremely early stage product. Errors should be gracefully handled, but they should always be visible to the developer and log visibly.
+
+## Legacy handling
+This is not a legacy project. This is a brand new project. We should not have a pattern of trying to handle legacy things by default. If something is a breaking change, you should point that out to me but most of the time we will want to make the breaking change. We don't have a large number of people who are relying on this app and breaking changes are fine. We're moving quickly and optimising for good architecture is more important than optimising for compatibility.
