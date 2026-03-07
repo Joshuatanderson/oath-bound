@@ -54,3 +54,6 @@ coverage/
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+
+# bun build artifacts
+*.bun-build
