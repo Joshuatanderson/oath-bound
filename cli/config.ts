@@ -63,11 +63,11 @@ export function writeOathboundConfig(enforcement: EnforcementLevel): boolean {
   return true;
 }
 
-const SKILL_CHECK = { type: 'command', command: 'oathbound verify --check' };
+const SKILL_CHECK = { type: 'command', command: 'npx oathbound verify --check' };
 
 const OATHBOUND_HOOKS = {
   SessionStart: [
-    { matcher: '', hooks: [{ type: 'command', command: 'oathbound verify' }] },
+    { matcher: '', hooks: [{ type: 'command', command: 'npx oathbound verify' }] },
   ],
   PreToolUse: [
     { matcher: 'Skill', hooks: [SKILL_CHECK] },
@@ -88,7 +88,7 @@ function hasOathboundHooks(settings: Record<string, unknown>): boolean {
       const innerHooks = e.hooks as Array<Record<string, unknown>> | undefined;
       if (!innerHooks) continue;
       for (const h of innerHooks) {
-        if (typeof h.command === 'string' && h.command.startsWith('oathbound')) return true;
+        if (typeof h.command === 'string' && h.command.startsWith('npx oathbound')) return true;
       }
     }
   }

@@ -7,6 +7,9 @@ import {
   isNewer,
   writeOathboundConfig,
   mergeClaudeSettings,
+  installDevDependency,
+  setup,
+  addPrepareScript,
 } from './cli';
 
 // --- stripJsoncComments ---
@@ -135,7 +138,7 @@ describe('mergeClaudeSettings', () => {
     const settings = JSON.parse(readFileSync(join(tmpDir, '.claude', 'settings.json'), 'utf-8'));
     expect(settings.hooks.SessionStart).toHaveLength(1);
     expect(settings.hooks.PreToolUse).toHaveLength(5);
-    expect(settings.hooks.SessionStart[0].hooks[0].command).toBe('oathbound verify');
+    expect(settings.hooks.SessionStart[0].hooks[0].command).toBe('npx oathbound verify');
     expect(settings.hooks.PreToolUse.map((e: { matcher: string }) => e.matcher)).toEqual(['Skill', 'Bash', 'Read', 'Glob', 'Grep']);
   });
 
@@ -159,18 +162,18 @@ describe('mergeClaudeSettings', () => {
     expect(settings.hooks.SessionStart).toHaveLength(2);
     expect(settings.hooks.SessionStart[0].hooks[0].command).toBe('echo hello');
     // Oathbound hooks added
-    expect(settings.hooks.SessionStart[1].hooks[0].command).toBe('oathbound verify');
+    expect(settings.hooks.SessionStart[1].hooks[0].command).toBe('npx oathbound verify');
     expect(settings.hooks.PreToolUse).toHaveLength(5);
     // Other keys preserved
     expect(settings.someOtherKey).toBe(true);
   });
 
-  test('skips if oathbound hooks already present', () => {
+  test('skips if npx oathbound hooks already present', () => {
     mkdirSync(join(tmpDir, '.claude'), { recursive: true });
     const existing = {
       hooks: {
         SessionStart: [
-          { matcher: '', hooks: [{ type: 'command', command: 'oathbound verify' }] },
+          { matcher: '', hooks: [{ type: 'command', command: 'npx oathbound verify' }] },
         ],
       },
     };
@@ -186,5 +189,129 @@ describe('mergeClaudeSettings', () => {
 
     const result = mergeClaudeSettings();
     expect(result).toBe('malformed');
+  });
+});
+
+// --- installDevDependency ---
+describe('installDevDependency', () => {
+  let tmpDir: string;
+  let origCwd: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'oathbound-test-'));
+    origCwd = process.cwd();
+    process.chdir(tmpDir);
+  });
+
+  afterEach(() => {
+    process.chdir(origCwd);
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('returns no-package-json when no package.json exists', () => {
+    const result = installDevDependency();
+    expect(result).toBe('no-package-json');
+  });
+
+  test('returns skipped when oathbound is already in devDependencies', () => {
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({
+      name: 'test',
+      devDependencies: { oathbound: '^0.4.0' },
+    }));
+    const result = installDevDependency();
+    expect(result).toBe('skipped');
+  });
+
+  test('returns skipped when oathbound is in dependencies', () => {
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({
+      name: 'test',
+      dependencies: { oathbound: '^0.4.0' },
+    }));
+    const result = installDevDependency();
+    expect(result).toBe('skipped');
+  });
+});
+
+// --- setup ---
+describe('setup', () => {
+  let tmpDir: string;
+  let origCwd: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'oathbound-test-'));
+    origCwd = process.cwd();
+    process.chdir(tmpDir);
+  });
+
+  afterEach(() => {
+    process.chdir(origCwd);
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('does nothing when no .oathbound.jsonc exists', () => {
+    setup();
+    expect(existsSync(join(tmpDir, '.claude', 'settings.json'))).toBe(false);
+  });
+
+  test('creates hooks when .oathbound.jsonc exists', () => {
+    writeFileSync(join(tmpDir, '.oathbound.jsonc'), '{ "enforcement": "warn" }');
+    setup();
+    const settings = JSON.parse(readFileSync(join(tmpDir, '.claude', 'settings.json'), 'utf-8'));
+    expect(settings.hooks.SessionStart).toHaveLength(1);
+    expect(settings.hooks.PreToolUse).toHaveLength(5);
+  });
+
+  test('is idempotent — skips if hooks already present', () => {
+    writeFileSync(join(tmpDir, '.oathbound.jsonc'), '{ "enforcement": "warn" }');
+    setup();
+    setup();
+    const settings = JSON.parse(readFileSync(join(tmpDir, '.claude', 'settings.json'), 'utf-8'));
+    expect(settings.hooks.SessionStart).toHaveLength(1);
+  });
+});
+
+// --- addPrepareScript ---
+describe('addPrepareScript', () => {
+  let tmpDir: string;
+  let origCwd: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'oathbound-test-'));
+    origCwd = process.cwd();
+    process.chdir(tmpDir);
+  });
+
+  afterEach(() => {
+    process.chdir(origCwd);
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test('returns skipped when no package.json', () => {
+    expect(addPrepareScript()).toBe('skipped');
+  });
+
+  test('adds prepare script to package.json without scripts', () => {
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test' }));
+    expect(addPrepareScript()).toBe('added');
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8'));
+    expect(pkg.scripts.prepare).toBe('oathbound setup');
+  });
+
+  test('appends to existing prepare script', () => {
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({
+      name: 'test',
+      scripts: { prepare: 'husky' },
+    }));
+    expect(addPrepareScript()).toBe('appended');
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8'));
+    expect(pkg.scripts.prepare).toBe('husky && oathbound setup');
+  });
+
+  test('skips when oathbound already in prepare script', () => {
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({
+      name: 'test',
+      scripts: { prepare: 'oathbound setup' },
+    }));
+    expect(addPrepareScript()).toBe('skipped');
   });
 });

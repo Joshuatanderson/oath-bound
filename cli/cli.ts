@@ -4,13 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import {
-  writeFileSync, unlinkSync, existsSync, mkdirSync,
+  writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
-import { intro, outro, select, cancel, isCancel } from '@clack/prompts';
+import { intro, outro, select, confirm, cancel, isCancel } from '@clack/prompts';
 
-import { BRAND, TEAL, GREEN, RED, DIM, BOLD, RESET, usage, fail, spinner } from './ui';
+import { BRAND, TEAL, GREEN, RED, YELLOW, DIM, BOLD, RESET, usage, fail, spinner } from './ui';
 import {
   stripJsoncComments, writeOathboundConfig, mergeClaudeSettings,
   type EnforcementLevel, type MergeResult,
@@ -21,6 +21,7 @@ import { verify, verifyCheck, findSkillsDir } from './verify';
 // Re-exports for tests
 export { stripJsoncComments, writeOathboundConfig, mergeClaudeSettings, type MergeResult } from './config';
 export { isNewer } from './update';
+export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult };
 
 const VERSION = '0.4.0';
 
@@ -43,6 +44,78 @@ function parseSkillArg(arg: string): { namespace: string; name: string } | null 
   return { namespace: arg.slice(0, slash), name: arg.slice(slash + 1) };
 }
 
+// --- Package manager detection ---
+type PackageManager = 'bun' | 'pnpm' | 'yarn' | 'npm';
+
+function detectPackageManager(): PackageManager {
+  if (existsSync(join(process.cwd(), 'bun.lockb')) || existsSync(join(process.cwd(), 'bun.lock'))) return 'bun';
+  if (existsSync(join(process.cwd(), 'pnpm-lock.yaml'))) return 'pnpm';
+  if (existsSync(join(process.cwd(), 'yarn.lock'))) return 'yarn';
+  return 'npm';
+}
+
+type InstallResult = 'installed' | 'skipped' | 'failed' | 'no-package-json';
+
+function installDevDependency(): InstallResult {
+  const pkgPath = join(process.cwd(), 'package.json');
+  if (!existsSync(pkgPath)) return 'no-package-json';
+
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+    if (pkg.devDependencies?.oathbound || pkg.dependencies?.oathbound) return 'skipped';
+  } catch {
+    // Malformed package.json — proceed with install attempt, let the package manager deal with it
+  }
+
+  const pm = detectPackageManager();
+  const cmds: Record<PackageManager, [string, string[]]> = {
+    bun: ['bun', ['add', '--dev', 'oathbound']],
+    pnpm: ['pnpm', ['add', '--save-dev', 'oathbound']],
+    yarn: ['yarn', ['add', '--dev', 'oathbound']],
+    npm: ['npm', ['install', '--save-dev', 'oathbound']],
+  };
+
+  const [bin, args] = cmds[pm];
+  try {
+    execFileSync(bin, args, { stdio: 'pipe', cwd: process.cwd() });
+    return 'installed';
+  } catch {
+    return 'failed';
+  }
+}
+
+// --- Setup command (non-interactive, idempotent, runs via prepare hook) ---
+function setup(): void {
+  if (!existsSync(join(process.cwd(), '.oathbound.jsonc'))) return;
+  const result = mergeClaudeSettings();
+  if (result === 'malformed') {
+    process.stderr.write('oathbound setup: .claude/settings.json is malformed — hooks not installed\n');
+    process.exit(1);
+  }
+}
+
+type PrepareResult = 'added' | 'appended' | 'skipped';
+
+function addPrepareScript(): PrepareResult {
+  const pkgPath = join(process.cwd(), 'package.json');
+  if (!existsSync(pkgPath)) return 'skipped';
+
+  let pkg: Record<string, unknown>;
+  try {
+    pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+  } catch {
+    return 'skipped'; // malformed package.json — let the package manager deal with it
+  }
+
+  const prepare = (pkg.scripts as Record<string, string> | undefined)?.prepare ?? '';
+  if (prepare.includes('oathbound setup')) return 'skipped';
+
+  const newPrepare = prepare ? `${prepare} && oathbound setup` : 'oathbound setup';
+  pkg.scripts = { ...(pkg.scripts as Record<string, string> ?? {}), prepare: newPrepare };
+  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+  return prepare ? 'appended' : 'added';
+}
+
 // --- Init command ---
 async function init(): Promise<void> {
   intro(BRAND);
@@ -62,6 +135,58 @@ async function init(): Promise<void> {
   }
 
   const level = enforcement as EnforcementLevel;
+
+  // Install as devDependency
+  let installResult = installDevDependency();
+
+  if (installResult === 'no-package-json') {
+    const shouldCreate = await confirm({
+      message: 'No package.json found. Create a minimal one?',
+    });
+
+    if (isCancel(shouldCreate) || !shouldCreate) {
+      cancel('Please run `npx oathbound init` inside of the folder where you want to run Claude Code. Oathbound currently needs an NPM package in order to run.');
+      process.exit(1);
+    }
+
+    const dirName = basename(process.cwd())
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]/g, '-')
+      .replace(/^[._]+/, '')
+      .replace(/-+/g, '-')
+      || 'project';
+    writeFileSync(
+      join(process.cwd(), 'package.json'),
+      JSON.stringify({
+        name: dirName,
+        private: true,
+        scripts: { prepare: 'oathbound setup' },
+      }, null, 2) + '\n',
+    );
+    process.stderr.write(`${GREEN} ✓ Created package.json${RESET}\n`);
+    installResult = installDevDependency();
+  }
+
+  switch (installResult) {
+    case 'installed':
+      process.stderr.write(`${GREEN} ✓ Added oathbound to devDependencies${RESET}\n`);
+      break;
+    case 'skipped':
+      process.stderr.write(`${DIM}   oathbound already in dependencies — skipped${RESET}\n`);
+      break;
+    case 'failed':
+      process.stderr.write(`${YELLOW} ⚠ Failed to add oathbound to devDependencies — install manually${RESET}\n`);
+      break;
+    case 'no-package-json':
+      process.stderr.write(`${RED} ✗ package.json was created but could not be found — something went wrong${RESET}\n`);
+      process.exit(1);
+  }
+
+  // Add prepare script to package.json
+  const prepareResult = addPrepareScript();
+  if (prepareResult === 'added' || prepareResult === 'appended') {
+    process.stderr.write(`${GREEN} ✓ Added prepare hook to package.json${RESET}\n`);
+  }
 
   // Write .oathbound.jsonc
   const configWritten = writeOathboundConfig(level);
@@ -178,7 +303,7 @@ if (subcommand === '--help' || subcommand === '-h') {
 }
 
 // Fire-and-forget auto-update on every command except verify (hooks must be fast)
-if (subcommand !== 'verify') {
+if (subcommand !== 'verify' && subcommand !== 'setup') {
   const updatePromise = checkForUpdate(VERSION).catch(() => {});
 
   if (subcommand === '--version' || subcommand === '-v') {
@@ -194,6 +319,8 @@ if (subcommand === 'init') {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Init failed', msg);
   });
+} else if (subcommand === 'setup') {
+  setup();
 } else if (subcommand === 'verify') {
   const isCheck = args.includes('--check');
   const run = isCheck ? verifyCheck : () => verify(SUPABASE_URL, SUPABASE_ANON_KEY);
