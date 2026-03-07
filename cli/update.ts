@@ -104,8 +104,8 @@ export async function checkForUpdate(version: string): Promise<void> {
     chmodSync(tmpPath, 0o755);
     renameSync(tmpPath, binaryPath);
     process.stderr.write(`${TEAL} ✓ Updated oathbound ${version} → ${latest}${RESET}\n`);
-  } catch {
-    // Network error or permission issue — silently ignore
-    // The next run will retry
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`${TEAL}Update check failed: ${msg}${RESET}\n`);
   }
 }
