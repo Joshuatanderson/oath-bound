@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -32,8 +33,15 @@ export function SiteHeader() {
     <header className="fixed top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-14 w-full items-center justify-between px-6">
         <div className="flex items-center gap-6">
-          <Link href="/" className="text-lg font-bold tracking-tight">
-            Oathbound
+          <Link href="/" className="flex items-center gap-2">
+            <Image
+              src="/oathbound-mid-teal-on-white.svg"
+              alt=""
+              width={28}
+              height={28}
+              className="shrink-0"
+            />
+            <span className="text-lg font-bold tracking-tight">Oathbound</span>
           </Link>
           <nav className="flex items-center gap-4 text-sm">
             <Link

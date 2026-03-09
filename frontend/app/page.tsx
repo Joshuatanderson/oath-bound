@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import Image from "next/image";
 import {
-  Shield,
   UserX,
   UserCheck,
   ShieldOff,
@@ -56,10 +56,18 @@ export default function Home() {
         {/* Hero */}
         <div className="flex flex-col items-center justify-center pt-24 pb-16 text-center sm:pt-32">
           <div className="flex flex-col items-center gap-4">
-            <Shield className="h-14 w-14 text-teal-2" />
-            <h1 className="text-7xl font-extralight tracking-normal text-teal-0">
-              Oathbound
-            </h1>
+            <div className="flex items-center gap-4">
+              <Image
+                src="/oathbound-mid-teal-on-white.svg"
+                alt=""
+                width={56}
+                height={56}
+                priority
+              />
+              <h1 className="text-7xl font-extralight tracking-normal text-teal-0">
+                Oathbound
+              </h1>
+            </div>
             <p className="max-w-md text-lg font-light tracking-normal text-white">
               Verified developers. Audited skills. Cryptographic proof.
             </p>
