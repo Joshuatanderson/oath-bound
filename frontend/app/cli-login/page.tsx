@@ -14,12 +14,15 @@ function CLILoginInner() {
     // Store port in a cookie so /auth/callback can redirect tokens to the CLI
     document.cookie = `cli_port=${port}; path=/; max-age=300; samesite=lax`;
 
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    console.log("[cli-login] port:", port);
+    console.log("[cli-login] redirectTo:", redirectTo);
+    console.log("[cli-login] cookies:", document.cookie);
+
     const supabase = getBrowserClient();
     supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
+      options: { redirectTo },
     });
   }, [port]);
 

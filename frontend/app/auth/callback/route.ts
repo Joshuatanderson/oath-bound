@@ -10,6 +10,8 @@ export async function GET(request: Request) {
   const cliPortMatch = cookies.match(/(?:^|;\s*)cli_port=(\d+)/);
   const cliPort = cliPortMatch?.[1] ?? null;
 
+  console.log("[auth/callback] hit!", { code: code?.slice(0, 8), cliPort, hasCookies: cookies.length > 0 });
+
   if (code) {
     const supabase = await getServerClient();
     const { data: sessionData, error } =
