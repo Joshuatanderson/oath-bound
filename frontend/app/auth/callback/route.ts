@@ -4,7 +4,11 @@ import { getServerClient } from "@/lib/supabase.server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const cliPort = searchParams.get("cli_port");
+
+  // Read CLI port from cookie (set by /cli-login page)
+  const cookies = request.headers.get("cookie") ?? "";
+  const cliPortMatch = cookies.match(/(?:^|;\s*)cli_port=(\d+)/);
+  const cliPort = cliPortMatch?.[1] ?? null;
 
   if (code) {
     const supabase = await getServerClient();
@@ -13,7 +17,7 @@ export async function GET(request: Request) {
 
     if (!error) {
       // CLI login flow — redirect tokens to the CLI's localhost server
-      if (cliPort && /^\d+$/.test(cliPort) && sessionData?.session) {
+      if (cliPort && sessionData?.session) {
         const { access_token, refresh_token, expires_at } =
           sessionData.session;
         const callbackUrl = new URL(
@@ -22,7 +26,11 @@ export async function GET(request: Request) {
         callbackUrl.searchParams.set("access_token", access_token);
         callbackUrl.searchParams.set("refresh_token", refresh_token);
         callbackUrl.searchParams.set("expires_at", String(expires_at));
-        return NextResponse.redirect(callbackUrl.toString());
+
+        // Clear the cli_port cookie
+        const res = NextResponse.redirect(callbackUrl.toString());
+        res.cookies.set("cli_port", "", { path: "/", maxAge: 0 });
+        return res;
       }
 
       // Normal web login flow

@@ -11,11 +11,14 @@ function CLILoginInner() {
   useEffect(() => {
     if (!port || !/^\d+$/.test(port)) return;
 
+    // Store port in a cookie so /auth/callback can redirect tokens to the CLI
+    document.cookie = `cli_port=${port}; path=/; max-age=300; samesite=lax`;
+
     const supabase = getBrowserClient();
     supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?cli_port=${port}`,
+        redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
   }, [port]);
