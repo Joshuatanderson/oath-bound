@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { getServerClient } from "@/lib/supabase.server";
 import { getAdminClient } from "@/lib/supabase.admin";
 import { createTarBuffer, hashTar } from "@/lib/tar";
@@ -23,8 +24,25 @@ interface SkillSubmission {
   files: SkillFile[];
 }
 
+/** Create a Supabase client from Bearer token or fall back to cookie auth. */
+async function getClientFromRequest(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice(7);
+    return createClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
+      {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+        auth: { autoRefreshToken: false, persistSession: false },
+      }
+    );
+  }
+  return getServerClient();
+}
+
 export async function POST(request: Request) {
-  const supabase = await getServerClient();
+  const supabase = await getClientFromRequest(request);
 
   const {
     data: { user },

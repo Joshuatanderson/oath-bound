@@ -17,13 +17,15 @@ import {
 } from './config';
 import { checkForUpdate, isNewer } from './update';
 import { verify, verifyCheck, findSkillsDir } from './verify';
+import { login, logout, whoami } from './auth';
+import { push } from './push';
 
 // Re-exports for tests
 export { stripJsoncComments, writeOathboundConfig, mergeClaudeSettings, type MergeResult } from './config';
 export { isNewer } from './update';
 export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult };
 
-const VERSION = '0.5.1';
+const VERSION = '0.6.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -328,6 +330,26 @@ if (subcommand === 'init') {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     process.stderr.write(`oathbound verify: ${msg}\n`);
     process.exit(1);
+  });
+} else if (subcommand === 'login') {
+  login().catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    fail('Login failed', msg);
+  });
+} else if (subcommand === 'logout') {
+  logout().catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    fail('Logout failed', msg);
+  });
+} else if (subcommand === 'whoami') {
+  whoami().catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    fail('Failed', msg);
+  });
+} else if (subcommand === 'push') {
+  push(args[1]).catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    fail('Push failed', msg);
   });
 } else {
   const PULL_ALIASES = new Set(['pull', 'i', 'install']);

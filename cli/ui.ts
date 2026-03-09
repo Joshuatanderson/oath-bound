@@ -12,12 +12,16 @@ export const BRAND = `${TEAL}${BOLD}🛡️ oathbound${RESET}`;
 
 export function usage(exitCode = 1): never {
   console.log(`
-${BOLD}oathbound${RESET} — install and verify skills
+${BOLD}oathbound${RESET} — install, verify, and publish skills
 
 ${DIM}Usage:${RESET}
   oathbound init                ${DIM}Setup wizard — configure project${RESET}
   oathbound pull <namespace/skill-name>
   oathbound install <namespace/skill-name>
+  oathbound push [path]         ${DIM}Publish a skill to the registry${RESET}
+  oathbound login               ${DIM}Authenticate with oathbound.ai${RESET}
+  oathbound logout              ${DIM}Clear stored credentials${RESET}
+  oathbound whoami              ${DIM}Show current user${RESET}
   oathbound verify              ${DIM}SessionStart hook — verify all skills${RESET}
   oathbound verify --check      ${DIM}PreToolUse hook — check skill integrity${RESET}
 
