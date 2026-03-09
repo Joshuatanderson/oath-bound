@@ -1,28 +1,36 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase.client";
 
 function CLILoginInner() {
   const searchParams = useSearchParams();
   const port = searchParams.get("port");
+  const [status, setStatus] = useState("Checking session...");
 
   useEffect(() => {
     if (!port || !/^\d+$/.test(port)) return;
 
-    // Store port in a cookie so /auth/callback can redirect tokens to the CLI
     document.cookie = `cli_port=${port}; path=/; max-age=300; samesite=lax`;
 
-    const redirectTo = `${window.location.origin}/auth/callback`;
-    console.log("[cli-login] port:", port);
-    console.log("[cli-login] redirectTo:", redirectTo);
-    console.log("[cli-login] cookies:", document.cookie);
-
     const supabase = getBrowserClient();
-    supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
+
+    // First check if the user already has a session (already logged in)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token && session?.refresh_token) {
+        setStatus("Redirecting to CLI...");
+        redirectToCLI(port, session);
+      } else {
+        // No session — need to log in via Google OAuth
+        setStatus("Redirecting to Google sign-in...");
+        supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+      }
     });
   }, [port]);
 
@@ -39,9 +47,21 @@ function CLILoginInner() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background font-sans">
-      <p className="text-muted-foreground">Redirecting to Google sign-in...</p>
+      <p className="text-muted-foreground">{status}</p>
     </div>
   );
+}
+
+function redirectToCLI(
+  port: string,
+  session: { access_token: string; refresh_token: string; expires_at?: number }
+) {
+  const callbackUrl = new URL(`http://localhost:${port}/callback`);
+  callbackUrl.searchParams.set("access_token", session.access_token);
+  callbackUrl.searchParams.set("refresh_token", session.refresh_token);
+  callbackUrl.searchParams.set("expires_at", String(session.expires_at ?? 0));
+  document.cookie = "cli_port=; path=/; max-age=0";
+  window.location.href = callbackUrl.toString();
 }
 
 export default function CLILoginPage() {

@@ -4,6 +4,14 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PATHS = ["/", "/login", "/setup", "/auth/callback", "/cli-login", "/terms", "/privacy"];
 
 export async function proxy(request: NextRequest) {
+  // Supabase sometimes ignores redirectTo and sends ?code= to the root path.
+  // Redirect to /auth/callback so the code exchange happens properly.
+  if (request.nextUrl.pathname === "/" && request.nextUrl.searchParams.has("code")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    return NextResponse.redirect(url);
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
