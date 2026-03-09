@@ -17,6 +17,7 @@ export async function GET(request: Request) {
 
     if (!error) {
       // CLI login flow — redirect tokens to the CLI's localhost server
+      // Uses client-side redirect to avoid Vercel edge stripping localhost redirects
       if (cliPort && sessionData?.session) {
         const { access_token, refresh_token, expires_at } =
           sessionData.session;
@@ -26,10 +27,21 @@ export async function GET(request: Request) {
         callbackUrl.searchParams.set("access_token", access_token);
         callbackUrl.searchParams.set("refresh_token", refresh_token);
         callbackUrl.searchParams.set("expires_at", String(expires_at));
+        const target = callbackUrl.toString();
 
-        // Clear the cli_port cookie
-        const res = NextResponse.redirect(callbackUrl.toString());
-        res.cookies.set("cli_port", "", { path: "/", maxAge: 0 });
+        // Clear the cli_port cookie and return an HTML page that redirects client-side
+        const html = `<!DOCTYPE html><html><head>
+          <meta http-equiv="refresh" content="0;url=${target}">
+          </head><body><p>Completing login...</p>
+          <script>window.location.href=${JSON.stringify(target)}</script>
+          </body></html>`;
+        const res = new Response(html, {
+          headers: { "Content-Type": "text/html" },
+        });
+        res.headers.append(
+          "Set-Cookie",
+          "cli_port=; Path=/; Max-Age=0"
+        );
         return res;
       }
 
