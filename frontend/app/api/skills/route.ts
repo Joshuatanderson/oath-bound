@@ -132,14 +132,14 @@ export async function POST(request: Request) {
     }
 
     if (body.originalAuthor) {
-      if (!meta["meta"]) meta["meta"] = {};
-      const metaObj = meta["meta"] as Record<string, unknown>;
+      if (!meta["metadata"]) meta["metadata"] = {};
+      const metaObj = meta["metadata"] as Record<string, unknown>;
       if (!metaObj["oathbound"]) metaObj["oathbound"] = {};
       const ob = metaObj["oathbound"] as Record<string, unknown>;
       ob["original-author"] = body.originalAuthor;
     } else {
       // Clean up if empty
-      const metaObj = meta["meta"] as Record<string, unknown> | undefined;
+      const metaObj = meta["metadata"] as Record<string, unknown> | undefined;
       if (metaObj?.["oathbound"]) {
         delete (metaObj["oathbound"] as Record<string, unknown>)["original-author"];
       }

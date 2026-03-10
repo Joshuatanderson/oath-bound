@@ -276,9 +276,9 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
 
   const allowedTools = String(meta["allowed-tools"] ?? "");
 
-  // Extract original-author from nested meta.oathbound namespace
+  // Extract original-author from nested metadata.oathbound namespace
   const oathboundMeta = (
-    (meta["meta"] as Record<string, unknown> | undefined)?.["oathbound"] as
+    (meta["metadata"] as Record<string, unknown> | undefined)?.["oathbound"] as
       | Record<string, unknown>
       | undefined
   );

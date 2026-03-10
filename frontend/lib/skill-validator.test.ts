@@ -591,6 +591,45 @@ describe("validateSkill — field errors (canProceed = false)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// metadata.oathbound.original-author
+// ---------------------------------------------------------------------------
+
+describe("validateSkill — metadata.oathbound.original-author", () => {
+  test("parses original-author from metadata.oathbound namespace", () => {
+    const fm = '---\nname: test\ndescription: A skill\nlicense: MIT\nmetadata:\n  oathbound:\n    original-author: alice\n---\n# Body';
+    const result = validateSkill([
+      { path: "my-skill/SKILL.md", content: fm },
+    ]);
+    expect(result.canProceed).toBe(true);
+    expect(result.parsed!.originalAuthor).toBe("alice");
+  });
+
+  test("original-author defaults to empty string when metadata absent", () => {
+    const result = validateSkill(validSkillFiles());
+    expect(result.canProceed).toBe(true);
+    expect(result.parsed!.originalAuthor).toBe("");
+  });
+
+  test("original-author with non-open-source license is blocked", () => {
+    const fm = '---\nname: test\ndescription: A skill\nlicense: Proprietary\nmetadata:\n  oathbound:\n    original-author: alice\n---\n# Body';
+    const result = validateSkill([
+      { path: "my-skill/SKILL.md", content: fm },
+    ]);
+    expect(result.canProceed).toBe(false);
+    expect(result.checks.some((c) => c.message.includes("original-author"))).toBe(true);
+  });
+
+  test("does NOT read original-author from old meta.oathbound namespace", () => {
+    const fm = '---\nname: test\ndescription: A skill\nlicense: MIT\nmeta:\n  oathbound:\n    original-author: alice\n---\n# Body';
+    const result = validateSkill([
+      { path: "my-skill/SKILL.md", content: fm },
+    ]);
+    expect(result.canProceed).toBe(true);
+    expect(result.parsed!.originalAuthor).toBe("");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Edge cases
 // ---------------------------------------------------------------------------
 

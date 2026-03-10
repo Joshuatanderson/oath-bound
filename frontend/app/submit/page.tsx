@@ -339,15 +339,17 @@ export default function SubmitPage() {
             <pre className="rounded-lg border border-border bg-muted/50 p-4 text-sm font-mono">
 {`skill-name/
 ├── SKILL.md          (required)
-├── scripts/          (optional)
-├── references/       (optional)
-└── assets/           (optional)`}
+├── scripts/          (convention)
+├── references/       (convention)
+├── assets/           (convention)
+└── ...               (additional files/dirs welcome)`}
             </pre>
             <p className="text-sm text-muted-foreground">
               SKILL.md must include frontmatter with{" "}
               <code className="font-mono">name</code>,{" "}
               <code className="font-mono">description</code>, and{" "}
               <code className="font-mono">license</code>.
+              Additional directories and frontmatter fields are welcome — the spec is a floor, not a ceiling.
             </p>
           </div>
 

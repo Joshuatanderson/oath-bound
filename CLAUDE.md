@@ -3,6 +3,7 @@ Less is more. Complexity breeds bugs. State should only be used when necessary, 
 - self-improve. When you run into an issue that you must remember in the next instance of yourself, note here, briefly.
 
 - always consult when you hit a decision point, or are considering a destructive action. You don't need to consult when you are simply following a plan or executing a task where there is one clear right path.
+- Don't commit unless explicitly commanded. However, always suggest a commit when a task is validated to work or needs to be tested through deploying.
 
 - always use simple, dry code. Less is more. Bring up edge cases, but worry about the core case primarily.
 - Never write code that silences failures from the user. Instead, provide clear error messages and consult with the user on how to handle unclear fail cases - this is important to not sweep issues under the rug.
@@ -42,10 +43,11 @@ your context is critical. Do not pollute it.
 - if you are interacting with an api that will likely be used again, consider making a skill - this can be a subagent/team's task, and then all future instances will benefit.
 
 ## CLI Versioning
+- **This project is in beta. Do NOT publish a 1.x version.** All versions must stay 0.x.x until explicitly told otherwise.
 - After any CLI change, bump the version in BOTH `cli/cli.ts` (`VERSION` const) AND `cli/package.json` following semver:
   - **patch** (0.8.0 → 0.8.1): bug fixes, minor tweaks
   - **minor** (0.8.0 → 0.9.0): new features, non-breaking additions
-  - **major** (0.8.0 → 1.0.0): breaking changes
+  - Do NOT bump to 1.0.0 — the product is not stable yet.
 - Do NOT run `npm publish` locally. GitHub Actions handles npm publication automatically on push to `main`.
 
 ## Context for deployment
