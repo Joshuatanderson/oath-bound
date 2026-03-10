@@ -35,7 +35,7 @@ export function SiteHeader() {
           <Link href="/" className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/oathbound-transparent-teal-mid.svg"
+              src="/oathbound-transparent-teal-mid.svg?v=2"
               alt=""
               width={28}
               height={28}
