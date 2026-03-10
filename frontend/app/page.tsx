@@ -64,7 +64,7 @@ export default function Home() {
                 height={56}
                 priority
               />
-              <h1 className="text-7xl font-extralight tracking-normal text-teal-0">
+              <h1 className="text-7xl font-extralight tracking-normal text-teal-4">
                 Oathbound
               </h1>
             </div>
