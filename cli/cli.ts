@@ -25,7 +25,7 @@ export { stripJsoncComments, writeOathboundConfig, mergeClaudeSettings, type Mer
 export { isNewer } from './update';
 export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult };
 
-const VERSION = '0.6.1';
+const VERSION = '0.7.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
