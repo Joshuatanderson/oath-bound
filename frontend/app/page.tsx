@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import Image from "next/image";
 import {
   UserX,
   UserCheck,
@@ -57,12 +56,12 @@ export default function Home() {
         <div className="flex flex-col items-center justify-center pt-24 pb-16 text-center sm:pt-32">
           <div className="flex flex-col items-center gap-4">
             <div className="flex items-center gap-4">
-              <Image
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src="/oathbound-transparent-teal-mid.svg"
                 alt=""
                 width={56}
                 height={56}
-                priority
               />
               <h1 className="text-7xl font-extralight tracking-normal text-teal-4">
                 Oathbound

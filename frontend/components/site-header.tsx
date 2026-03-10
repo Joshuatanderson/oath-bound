@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -34,7 +33,8 @@ export function SiteHeader() {
       <div className="flex h-14 w-full items-center justify-between px-6">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src="/oathbound-transparent-teal-mid.svg"
               alt=""
               width={28}
