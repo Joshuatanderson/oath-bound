@@ -1,11 +1,12 @@
 import { existsSync, statSync } from 'node:fs';
 import { join, basename, resolve } from 'node:path';
 import { intro, outro } from '@clack/prompts';
+import { parse as yamlParse } from 'yaml';
 import { BRAND, GREEN, DIM, BOLD, RESET, fail, spinner } from './ui';
 import { getAccessToken } from './auth';
 import { collectFiles } from './content-hash';
 
-const API_BASE = process.env.OATHBOUND_API_URL ?? 'https://oathbound.ai';
+const API_BASE = process.env.OATHBOUND_API_URL ?? 'https://www.oathbound.ai';
 
 export async function push(pathArg?: string): Promise<void> {
   intro(BRAND);
@@ -29,24 +30,27 @@ export async function push(pathArg?: string): Promise<void> {
   }
 
   const meta = parseFrontmatter(skillMdFile.content.toString('utf-8'));
-  if (!meta.name) {
-    fail('SKILL.md frontmatter missing: name');
-  }
-  if (!meta.description) {
-    fail('SKILL.md frontmatter missing: description');
-  }
-  if (!meta.license) {
-    fail('SKILL.md frontmatter missing: license');
-  }
+  const name = String(meta.name ?? '');
+  const description = String(meta.description ?? '');
+  const license = String(meta.license ?? '');
+  if (!name) fail('SKILL.md frontmatter missing: name');
+  if (!description) fail('SKILL.md frontmatter missing: description');
+  if (!license) fail('SKILL.md frontmatter missing: license');
+
+  const oathboundMeta = (meta.meta as Record<string, unknown> | undefined)?.oathbound as Record<string, unknown> | undefined;
+  const originalAuthor = String(oathboundMeta?.['original-author'] ?? '');
 
   // Build files array with root dir prefix (API expects rootDir/path format)
   const files = rawFiles.map(f => ({
-    path: `${meta.name}/${f.path}`,
+    path: `${name}/${f.path}`,
     content: f.content.toString('utf-8'),
   }));
 
-  console.log(`${DIM}   name: ${meta.name}${RESET}`);
-  console.log(`${DIM}   license: ${meta.license}${RESET}`);
+  console.log(`${DIM}   name: ${name}${RESET}`);
+  console.log(`${DIM}   license: ${license}${RESET}`);
+  if (originalAuthor) {
+    console.log(`${DIM}   original author: ${originalAuthor}${RESET}`);
+  }
   console.log(`${DIM}   ${files.length} file(s)${RESET}`);
 
   // Authenticate
@@ -62,11 +66,12 @@ export async function push(pathArg?: string): Promise<void> {
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      name: meta.name,
-      description: meta.description,
-      license: meta.license,
-      compatibility: meta.compatibility || null,
-      allowedTools: meta['allowed-tools'] || null,
+      name,
+      description,
+      license,
+      compatibility: String(meta.compatibility ?? '') || null,
+      allowedTools: String(meta['allowed-tools'] ?? '') || null,
+      originalAuthor: originalAuthor || null,
       files,
     }),
   });
@@ -109,18 +114,10 @@ function resolveSkillDir(pathArg?: string): string {
   );
 }
 
-/** Lightweight frontmatter parser (mirrors frontend/lib/skill-validator.ts) */
-function parseFrontmatter(content: string): Record<string, string> {
+/** Parse YAML frontmatter into a nested object */
+function parseFrontmatter(content: string): Record<string, unknown> {
   const match = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
   if (!match) return {};
-
-  const meta: Record<string, string> = {};
-  for (const line of match[1].split('\n')) {
-    const idx = line.indexOf(':');
-    if (idx === -1) continue;
-    const key = line.slice(0, idx).trim();
-    const value = line.slice(idx + 1).trim();
-    if (key) meta[key] = value;
-  }
-  return meta;
+  const parsed = yamlParse(match[1]);
+  return typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : {};
 }

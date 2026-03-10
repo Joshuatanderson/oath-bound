@@ -41,6 +41,13 @@ your context is critical. Do not pollute it.
 - if you are interacting w an api that is one off, don't worry about making a skill.
 - if you are interacting with an api that will likely be used again, consider making a skill - this can be a subagent/team's task, and then all future instances will benefit.
 
+## CLI Versioning
+- After any CLI change, bump the version in BOTH `cli/cli.ts` (`VERSION` const) AND `cli/package.json` following semver:
+  - **patch** (0.8.0 → 0.8.1): bug fixes, minor tweaks
+  - **minor** (0.8.0 → 0.9.0): new features, non-breaking additions
+  - **major** (0.8.0 → 1.0.0): breaking changes
+- Do NOT run `npm publish` locally. GitHub Actions handles npm publication automatically on push to `main`.
+
 ## Context for deployment
 - you are deployed at oathbound.ai
 

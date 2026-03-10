@@ -13,14 +13,13 @@ import { ensureChainWrite, registerSkill } from "@/lib/sui";
 import type { SkillFile } from "@/lib/skill-validator";
 import type { Database } from "@/lib/database.types";
 
-type LicenseType = Database["public"]["Enums"]["license_type"];
-
 interface SkillSubmission {
   name: string;
   description: string;
   license: string;
   compatibility: string | null;
   allowedTools: string | null;
+  originalAuthor: string | null;
   files: SkillFile[];
 }
 
@@ -132,6 +131,20 @@ export async function POST(request: Request) {
       delete meta["allowed-tools"];
     }
 
+    if (body.originalAuthor) {
+      if (!meta["meta"]) meta["meta"] = {};
+      const metaObj = meta["meta"] as Record<string, unknown>;
+      if (!metaObj["oathbound"]) metaObj["oathbound"] = {};
+      const ob = metaObj["oathbound"] as Record<string, unknown>;
+      ob["original-author"] = body.originalAuthor;
+    } else {
+      // Clean up if empty
+      const metaObj = meta["meta"] as Record<string, unknown> | undefined;
+      if (metaObj?.["oathbound"]) {
+        delete (metaObj["oathbound"] as Record<string, unknown>)["original-author"];
+      }
+    }
+
     body.files[skillIdx].content = serializeFrontmatter(meta, skillBody);
   }
 
@@ -197,7 +210,7 @@ export async function POST(request: Request) {
   }
 
   // Insert skill record
-  const license = body.license.toUpperCase() as LicenseType;
+  const license = body.license.toUpperCase();
 
   const { error: insertError } = await supabase.from("skills").insert({
     name: body.name,
@@ -206,6 +219,7 @@ export async function POST(request: Request) {
     license,
     compatibility: body.compatibility || null,
     allowed_tools: body.allowedTools || null,
+    original_author: body.originalAuthor || null,
     storage_path: storagePath,
     tar_hash: tarHash,
     content_hash: contentHashValue,

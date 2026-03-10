@@ -3,9 +3,9 @@ import {
   writeFileSync, readFileSync, existsSync,
   readdirSync, statSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { BRAND, TEAL, GREEN, RED, YELLOW, DIM, RESET } from './ui';
+import { BRAND, TEAL, GREEN, RED, YELLOW, DIM, BOLD, RESET } from './ui';
 import { hashSkillDir } from './content-hash';
 import { readOathboundConfig, type EnforcementLevel } from './config';
 
@@ -92,15 +92,49 @@ function skillNameFromCommand(command: string): string | null {
   return name || null;
 }
 
-function denySkill(reason: string): never {
+function denySkill(skillName: string, reason: string, enforcement: EnforcementLevel): never {
+  process.stderr.write(`\n${TEAL}${BOLD}⬡ oathbound${RESET} ${RED}${BOLD}✗ Blocked${RESET} skill ${BOLD}"${skillName}"${RESET} ${DIM}(${reason})${RESET}\n`);
+  process.stderr.write(`${DIM}  enforcement: ${enforcement} — switch to "warn" in .oathbound.jsonc for development${RESET}\n\n`);
   console.log(JSON.stringify({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
-      permissionDecisionReason: reason,
+      permissionDecisionReason: `Oathbound: skill "${skillName}" blocked — ${reason} (enforcement: ${enforcement})`,
     },
   }));
   process.exit(0);
+}
+
+function warnSkill(skillName: string, reason: string): never {
+  process.stderr.write(`\n${TEAL}${BOLD}⬡ oathbound${RESET} ${YELLOW}⚠ Warning:${RESET} skill ${BOLD}"${skillName}"${RESET} ${DIM}(${reason})${RESET}\n\n`);
+  process.exit(0);
+}
+
+/** Check if a tool operation references a skill in another project, not ours. */
+function isExternalSkillAccess(
+  toolName: string,
+  toolInput: Record<string, unknown>,
+  skillsDir: string,
+  baseName: string,
+): boolean {
+  const resolvedSkillsDir = resolve(skillsDir);
+
+  if (toolName === 'Read') {
+    const p = String(toolInput.file_path ?? '');
+    if (p && !resolve(p).startsWith(resolvedSkillsDir)) return true;
+  }
+  if (toolName === 'Glob' || toolName === 'Grep') {
+    const p = String(toolInput.path ?? '');
+    if (p && !resolve(p).startsWith(resolvedSkillsDir)) return true;
+  }
+  if (toolName === 'Bash') {
+    const cmd = String(toolInput.command ?? '');
+    // If the command contains an absolute path to .claude/skills/baseName
+    // that ISN'T under our project's skills dir, it's external
+    if (cmd.includes('/.claude/skills/' + baseName) && !cmd.includes(resolvedSkillsDir)) return true;
+  }
+
+  return false;
 }
 
 // --- Verify (SessionStart hook) ---
@@ -233,7 +267,8 @@ export async function verify(supabaseUrl: string, supabaseAnonKey: string): Prom
     // Warn mode — all skills allowed but with warnings
     const warnLines = warnings.map((w) => `  ⚠ ${w.name}: ${w.reason}`).join('\n');
     const names = Object.keys(verified).join(', ');
-    process.stderr.write(`${YELLOW}Oathbound warnings (enforcement: warn):\n${warnLines}${RESET}\n`);
+    const warnHeader = `${TEAL}${BOLD}⬡ oathbound${RESET} ${YELLOW}⚠ Unverified skills (enforcement: warn):${RESET}`;
+    process.stderr.write(`${warnHeader}\n${warnLines}\n${DIM}  Skills allowed but not verified against registry.${RESET}\n`);
     console.log(JSON.stringify({
       hookSpecificOutput: {
         hookEventName: 'SessionStart',
@@ -242,8 +277,8 @@ export async function verify(supabaseUrl: string, supabaseAnonKey: string): Prom
     }));
     process.exit(0);
   } else {
-    const lines = rejected.map((r) => `  - ${r.name}: ${r.reason}`);
-    process.stderr.write(`Oathbound: skill verification failed! (enforcement: ${enforcement})\n${lines.join('\n')}\nDo NOT use unverified skills.\n`);
+    const lines = rejected.map((r) => `  ${RED}✗${RESET} ${r.name}: ${r.reason}`);
+    process.stderr.write(`\n${TEAL}${BOLD}⬡ oathbound${RESET} ${RED}${BOLD}✗ Skill verification failed${RESET} ${DIM}(enforcement: ${enforcement})${RESET}\n${lines.join('\n')}\n${DIM}  Do NOT use unverified skills.${RESET}\n\n`);
     process.exit(2);
   }
 }
@@ -284,6 +319,16 @@ export async function verifyCheck(): Promise<void> {
   // Not a skill-related operation — allow through
   if (!baseName) process.exit(0);
 
+  // Read enforcement config
+  const config = readOathboundConfig();
+  const enforcement: EnforcementLevel = config?.enforcement ?? 'warn';
+
+  // Check if the tool is accessing a skill in another project — not our concern
+  const skillsDir = findSkillsDir();
+  if (isExternalSkillAccess(toolName, toolInput, skillsDir, baseName)) {
+    process.exit(0);
+  }
+
   const stateFile = sessionStatePath(sessionId);
   if (!existsSync(stateFile)) process.exit(0);
 
@@ -296,24 +341,33 @@ export async function verifyCheck(): Promise<void> {
   }
 
   // Find the skill directory and re-hash
-  const skillsDir = findSkillsDir();
   const skillDir = join(skillsDir, baseName);
 
   if (!existsSync(skillDir) || !statSync(skillDir).isDirectory()) {
-    denySkill(`Oathbound: skill directory not found for "${baseName}"`);
+    if (enforcement === 'warn') {
+      warnSkill(baseName, 'not installed locally');
+    } else {
+      denySkill(baseName, 'not installed locally', enforcement);
+    }
   }
 
   const currentHash = hashSkillDir(skillDir);
   const sessionHash = state.verified[baseName];
 
   if (!sessionHash) {
-    process.stderr.write(`${RED}   ${baseName}: ${currentHash} (not verified at session start)${RESET}\n`);
-    denySkill(`Oathbound: skill "${baseName}" was not verified at session start`);
+    if (enforcement === 'warn') {
+      warnSkill(baseName, 'not verified at session start');
+    } else {
+      denySkill(baseName, 'not verified at session start', enforcement);
+    }
   }
 
   if (currentHash !== sessionHash) {
-    process.stderr.write(`${RED}   ${baseName}: ${currentHash} ≠ ${sessionHash} (tampered)${RESET}\n`);
-    denySkill(`Oathbound: skill "${baseName}" was modified since session start (tampering detected)`);
+    if (enforcement === 'warn') {
+      warnSkill(baseName, `modified since session start (${currentHash.slice(0, 8)}… ≠ ${sessionHash.slice(0, 8)}…)`);
+    } else {
+      denySkill(baseName, `modified since session start — tampering detected (${currentHash.slice(0, 8)}… ≠ ${sessionHash.slice(0, 8)}…)`, enforcement);
+    }
   }
 
   process.stderr.write(`${GREEN}   ${baseName}: ${currentHash} ✓${RESET}\n`);

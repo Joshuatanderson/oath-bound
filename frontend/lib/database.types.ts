@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      licenses: {
+        Row: {
+          id: string
+          display_name: string
+          is_open_source: boolean
+        }
+        Insert: {
+          id: string
+          display_name: string
+          is_open_source?: boolean
+        }
+        Update: {
+          id?: string
+          display_name?: string
+          is_open_source?: boolean
+        }
+        Relationships: []
+      }
       audits: {
         Row: {
           audited_at: string
@@ -110,9 +128,10 @@ export type Database = {
           created_at: string | null
           description: string
           id: string
-          license: Database["public"]["Enums"]["license_type"]
+          license: string
           name: string
           namespace: string
+          original_author: string | null
           storage_path: string
           sui_digest: string | null
           sui_object_id: string | null
@@ -128,9 +147,10 @@ export type Database = {
           created_at?: string | null
           description: string
           id?: string
-          license?: Database["public"]["Enums"]["license_type"]
+          license: string
           name: string
           namespace: string
+          original_author?: string | null
           storage_path: string
           sui_digest?: string | null
           sui_object_id?: string | null
@@ -146,9 +166,10 @@ export type Database = {
           created_at?: string | null
           description?: string
           id?: string
-          license?: Database["public"]["Enums"]["license_type"]
+          license?: string
           name?: string
           namespace?: string
+          original_author?: string | null
           storage_path?: string
           sui_digest?: string | null
           sui_object_id?: string | null
@@ -158,6 +179,13 @@ export type Database = {
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "skills_license_fkey"
+            columns: ["license"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "skills_user_id_fkey"
             columns: ["user_id"]
@@ -202,18 +230,6 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      license_type:
-        | "MIT"
-        | "APACHE-2.0"
-        | "BSD-2-CLAUSE"
-        | "BSD-3-CLAUSE"
-        | "GPL-3.0-ONLY"
-        | "AGPL-3.0-ONLY"
-        | "ISC"
-        | "UNLICENSE"
-        | "BUSL-1.1"
-        | "MPL-2.0"
-        | "PROPRIETARY"
       user_role: "DEVELOPER" | "AUDITOR"
     }
     CompositeTypes: {
@@ -342,19 +358,6 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      license_type: [
-        "MIT",
-        "APACHE-2.0",
-        "BSD-2-CLAUSE",
-        "BSD-3-CLAUSE",
-        "GPL-3.0-ONLY",
-        "AGPL-3.0-ONLY",
-        "ISC",
-        "UNLICENSE",
-        "BUSL-1.1",
-        "MPL-2.0",
-        "PROPRIETARY",
-      ],
       user_role: ["DEVELOPER", "AUDITOR"],
     },
   },

@@ -20,6 +20,7 @@ import {
   VALID_LICENSES,
   MAX_UPLOAD_SIZE,
   MAX_FILE_COUNT,
+  isOpenSourceLicense,
   type SkillFile,
   type ValidationCheck,
   type ParsedSkill,
@@ -80,6 +81,11 @@ export default function SubmitPage() {
   const [compatibility, setCompatibility] = useState("");
   const [allowedTools, setAllowedTools] = useState("");
   const [skillBody, setSkillBody] = useState("");
+  const [originalAuthor, setOriginalAuthor] = useState("");
+
+  const originalAuthorError = originalAuthor.trim() !== "" && license !== "" && !isOpenSourceLicense(license)
+    ? "Original author can only be set for open-source licenses"
+    : null;
 
   // ------ File processing ------
 
@@ -208,6 +214,7 @@ export default function SubmitPage() {
     setCompatibility(p.compatibility);
     setAllowedTools(p.allowedTools);
     setSkillBody(p.body);
+    setOriginalAuthor(p.originalAuthor || "");
     setStep(2);
   }
 
@@ -217,6 +224,7 @@ export default function SubmitPage() {
 
   function reset() {
     setUpload(EMPTY_UPLOAD);
+    setOriginalAuthor("");
     setStep(1);
   }
 
@@ -232,6 +240,7 @@ export default function SubmitPage() {
     name.trim() !== "" &&
     description.trim() !== "" &&
     license !== "" &&
+    !originalAuthorError &&
     !submitting;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -251,6 +260,7 @@ export default function SubmitPage() {
           license,
           compatibility: compatibility || null,
           allowedTools: allowedTools || null,
+          originalAuthor: originalAuthor.trim() || null,
           files: upload.files,
         }),
       });
@@ -492,6 +502,23 @@ export default function SubmitPage() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Original Author (optional — open-source only) */}
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="skill-original-author">Original Author</Label>
+            <Input
+              id="skill-original-author"
+              value={originalAuthor}
+              onChange={(e) => setOriginalAuthor(e.target.value)}
+              placeholder="e.g. Anthropic"
+            />
+            <p className="text-xs text-muted-foreground">
+              Credit the original author when publishing an open-source skill you didn't write.
+            </p>
+            {originalAuthorError && (
+              <p className="text-sm text-destructive">{originalAuthorError}</p>
+            )}
           </div>
 
           {/* Compatibility (optional) */}

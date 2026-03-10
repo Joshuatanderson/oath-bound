@@ -44,7 +44,7 @@ export default async function SkillPage({
   const { data: skill, error } = await supabase
     .from("skills")
     .select(
-      "id, name, namespace, description, license, version, compatibility, allowed_tools, created_at, user_id, sui_digest, sui_object_id"
+      "id, name, namespace, description, license, version, compatibility, allowed_tools, created_at, user_id, sui_digest, sui_object_id, original_author"
     )
     .eq("id", id)
     .single();
@@ -113,6 +113,9 @@ export default async function SkillPage({
 
       <div className="flex flex-wrap gap-2">
         <Badge variant="outline">by {skill.namespace}</Badge>
+        {skill.original_author && (
+          <Badge variant="outline">Original author: {skill.original_author}</Badge>
+        )}
         <Badge variant="secondary">License: {skill.license}</Badge>
         {skill.compatibility && (
           <Badge variant="secondary" className="h-auto whitespace-normal">

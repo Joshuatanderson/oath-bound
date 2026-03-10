@@ -4,7 +4,6 @@ import {
   serializeFrontmatter,
   validateSkill,
   VALID_LICENSES,
-  ALLOWED_DIRS,
   MAX_UPLOAD_SIZE,
   MAX_FILE_COUNT,
   type SkillFile,
@@ -65,12 +64,12 @@ describe("serializeFrontmatter", () => {
     expect(result).toContain("version: 1.0.0");
   });
 
-  test("omits fields with empty string values", () => {
+  test("includes empty string values (yaml serialization)", () => {
     const result = serializeFrontmatter(
       { name: "test", compatibility: "", license: "MIT" },
       "Body"
     );
-    expect(result).not.toContain("compatibility");
+    expect(result).toContain("compatibility:");
     expect(result).toContain("name: test");
     expect(result).toContain("license: MIT");
   });
@@ -98,14 +97,14 @@ describe("parseFrontmatter", () => {
 
   test("handles description containing colons", () => {
     const { meta } = parseFrontmatter(
-      "---\ndescription: does things: many things\n---\nBody"
+      '---\ndescription: "does things: many things"\n---\nBody'
     );
     expect(meta.description).toBe("does things: many things");
   });
 
   test("handles empty value for a key", () => {
     const { meta } = parseFrontmatter("---\nlicense:\n---\nBody");
-    expect(meta.license).toBe("");
+    expect(meta.license).toBeNull();
   });
 });
 
@@ -213,21 +212,20 @@ describe("validateSkill — structure errors (canProceed = false)", () => {
     expect(result.checks.some((c) => c.message.includes("Missing required SKILL.md"))).toBe(true);
   });
 
-  test("unexpected file at root level", () => {
+  test("extra file at root level is allowed (floor not ceiling)", () => {
     const result = validateSkill([
       ...validSkillFiles(),
-      { path: "my-skill/random.txt", content: "nope" },
+      { path: "my-skill/random.txt", content: "extra content" },
     ]);
-    expect(result.canProceed).toBe(false);
-    expect(result.checks.some((c) => c.message.includes("Unexpected entry"))).toBe(true);
+    expect(result.canProceed).toBe(true);
   });
 
-  test("unexpected directory at root level", () => {
+  test("extra directory at root level is allowed (floor not ceiling)", () => {
     const result = validateSkill([
       ...validSkillFiles(),
-      { path: "my-skill/other-dir/file.txt", content: "nope" },
+      { path: "my-skill/evals/test.md", content: "evaluation" },
     ]);
-    expect(result.canProceed).toBe(false);
+    expect(result.canProceed).toBe(true);
   });
 
   test("empty body after frontmatter", () => {
@@ -614,22 +612,18 @@ describe("validateSkill — edge cases", () => {
   });
 
   test("description containing colons parses correctly", () => {
-    const result = validateSkill(
-      validSkillFiles({
-        frontmatter: {
-          name: "test",
-          description: "does things: many things: even more",
-          license: "MIT",
-        },
-      })
-    );
+    // Values with colons must be quoted in YAML
+    const fm = '---\nname: test\ndescription: "does things: many things: even more"\nlicense: MIT\n---\n# My Skill\n\nDo the thing.';
+    const result = validateSkill([
+      { path: "my-skill/SKILL.md", content: fm },
+    ]);
     expect(result.canProceed).toBe(true);
     expect(result.parsed!.description).toBe(
       "does things: many things: even more"
     );
   });
 
-  test.each(ALLOWED_DIRS.map((d) => [d]))("allowed dir in isolation: %s", (dir) => {
+  test.each([["scripts"], ["references"], ["assets"], ["evals"], ["templates"]])("any dir at root is allowed: %s", (dir) => {
     const result = validateSkill(
       validSkillFiles({
         extraFiles: [{ path: `my-skill/${dir}/file.txt`, content: "content" }],
