@@ -24,12 +24,20 @@ export async function push(pathArg?: string): Promise<void> {
 
   // Parse SKILL.md frontmatter to extract metadata
   const skillMdFile = rawFiles.find(f => f.path === 'SKILL.md');
-  if (!skillMdFile) fail('SKILL.md not found in collected files');
+  if (!skillMdFile) {
+    fail('SKILL.md not found in collected files');
+  }
 
   const meta = parseFrontmatter(skillMdFile.content.toString('utf-8'));
-  if (!meta.name) fail('SKILL.md frontmatter missing: name');
-  if (!meta.description) fail('SKILL.md frontmatter missing: description');
-  if (!meta.license) fail('SKILL.md frontmatter missing: license');
+  if (!meta.name) {
+    fail('SKILL.md frontmatter missing: name');
+  }
+  if (!meta.description) {
+    fail('SKILL.md frontmatter missing: description');
+  }
+  if (!meta.license) {
+    fail('SKILL.md frontmatter missing: license');
+  }
 
   // Build files array with root dir prefix (API expects rootDir/path format)
   const files = rawFiles.map(f => ({

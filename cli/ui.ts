@@ -8,7 +8,13 @@ export const DIM = USE_COLOR ? '\x1b[2m' : '';
 export const BOLD = USE_COLOR ? '\x1b[1m' : '';
 export const RESET = USE_COLOR ? '\x1b[0m' : '';
 
-export const BRAND = `${TEAL}${BOLD}🛡️ oathbound${RESET}`;
+const BRAND_MARKS = ['✦', '✧', '✿', '⬡'];
+
+export function brand(): string {
+  return `${TEAL}${BOLD}⬡ oathbound${RESET}`;
+}
+
+export const BRAND = brand();
 
 export function usage(exitCode = 1): never {
   console.log(`
@@ -41,13 +47,13 @@ export function fail(message: string, detail?: string): never {
 }
 
 export function spinner(text: string): { stop: () => void } {
-  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   let i = 0;
-  process.stdout.write(`${TEAL} ${frames[0]} ${text}${RESET}`);
+  const render = () => `\r${TEAL}${BOLD} ${BRAND_MARKS[i % BRAND_MARKS.length]} ${RESET}${TEAL}${text}${RESET}`;
+  process.stdout.write(render());
   const interval = setInterval(() => {
-    i = (i + 1) % frames.length;
-    process.stdout.write(`\r${TEAL} ${frames[i]} ${text}${RESET}`);
-  }, 80);
+    i++;
+    process.stdout.write(render());
+  }, 150);
   return {
     stop() {
       clearInterval(interval);
