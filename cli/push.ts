@@ -37,7 +37,7 @@ export async function push(pathArg?: string): Promise<void> {
   if (!description) fail('SKILL.md frontmatter missing: description');
   if (!license) fail('SKILL.md frontmatter missing: license');
 
-  const oathboundMeta = (meta.meta as Record<string, unknown> | undefined)?.oathbound as Record<string, unknown> | undefined;
+  const oathboundMeta = (meta.metadata as Record<string, unknown> | undefined)?.oathbound as Record<string, unknown> | undefined;
   const originalAuthor = String(oathboundMeta?.['original-author'] ?? '');
 
   // Build files array with root dir prefix (API expects rootDir/path format)
