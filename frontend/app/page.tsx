@@ -60,7 +60,7 @@ export default function Home() {
               <img
                 src="/oathbound-transparent-teal-mid.svg?v=2"
                 alt=""
-                className="h-[1em]"
+                className="h-[1em] w-auto"
               />
               <h1 className="font-extralight tracking-normal text-teal-4">
                 Oathbound
