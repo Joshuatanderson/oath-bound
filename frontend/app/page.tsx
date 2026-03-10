@@ -58,7 +58,7 @@ export default function Home() {
           <div className="flex flex-col items-center gap-4">
             <div className="flex items-center gap-4">
               <Image
-                src="/oathbound-mid-teal-on-white.svg"
+                src="/oathbound-transparent-teal-mid.svg"
                 alt=""
                 width={56}
                 height={56}

@@ -35,7 +35,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
             <Image
-              src="/oathbound-mid-teal-on-white.svg"
+              src="/oathbound-transparent-teal-mid.svg"
               alt=""
               width={28}
               height={28}
