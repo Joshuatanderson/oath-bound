@@ -55,7 +55,7 @@ export default function Home() {
         {/* Hero */}
         <div className="flex flex-col items-center justify-center pt-24 pb-16 text-center sm:pt-32">
           <div className="flex flex-col items-center gap-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/oathbound-transparent-teal-mid.svg"
