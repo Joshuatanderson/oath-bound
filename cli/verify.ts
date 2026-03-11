@@ -5,6 +5,7 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { parse as yamlParse } from 'yaml';
 import { BRAND, TEAL, GREEN, RED, YELLOW, DIM, BOLD, RESET } from './ui';
 import { hashSkillDir } from './content-hash';
 import { readOathboundConfig, type EnforcementLevel } from './config';
@@ -137,6 +138,21 @@ function isExternalSkillAccess(
   return false;
 }
 
+function parseSkillVersion(skillDir: string): number | null {
+  const skillMdPath = join(skillDir, 'SKILL.md');
+  if (!existsSync(skillMdPath)) return null;
+  const content = readFileSync(skillMdPath, 'utf-8');
+  const match = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
+  if (!match) return null;
+  try {
+    const parsed = yamlParse(match[1]);
+    const v = parsed?.version;
+    return typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 // --- Verify (SessionStart hook) ---
 export async function verify(supabaseUrl: string, supabaseAnonKey: string): Promise<void> {
   let input: Record<string, unknown>;
@@ -174,18 +190,20 @@ export async function verify(supabaseUrl: string, supabaseAnonKey: string): Prom
     process.exit(0);
   }
 
-  // Hash each local skill
-  const localHashes: Record<string, string> = {};
+  // Hash each local skill and parse version from SKILL.md
+  const localSkills: Record<string, { hash: string; version: number }> = {};
   for (const dir of skillDirs) {
     const fullPath = join(skillsDir, dir.name);
-    localHashes[dir.name] = hashSkillDir(fullPath);
+    const hash = hashSkillDir(fullPath);
+    const version = parseSkillVersion(fullPath) ?? 1; // fallback to v1 for pre-versioning installs
+    localSkills[dir.name] = { hash, version };
   }
 
   // Read enforcement config
   const config = readOathboundConfig();
   const enforcement: EnforcementLevel = config?.enforcement ?? 'warn';
 
-  // Fetch registry hashes from Supabase (latest version per skill name)
+  // Fetch registry data from Supabase (all versions)
   // If enforcement=audited, also fetch audit status
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
   const selectFields = enforcement === 'audited'
@@ -201,19 +219,19 @@ export async function verify(supabaseUrl: string, supabaseAnonKey: string): Prom
     process.exit(1);
   }
 
-  // Build lookup: skill name → latest content_hash (dedupe by taking first per name)
-  const registryHashes = new Map<string, string>();
-  const auditedSkills = new Set<string>(); // skills with at least one passed audit
+  // Build lookup: name → version → { hash, audited }
+  const registryMap = new Map<string, Map<number, { hash: string; audited: boolean }>>();
   for (const skill of skills ?? []) {
     if (!skill.content_hash) continue;
-    if (!registryHashes.has(skill.name)) {
-      registryHashes.set(skill.name, skill.content_hash);
+    if (!registryMap.has(skill.name)) {
+      registryMap.set(skill.name, new Map());
     }
-    if (enforcement === 'audited') {
-      const audits = (skill as Record<string, unknown>).audits as Array<{ passed: boolean }> | null;
-      if (audits?.some((a) => a.passed)) {
-        auditedSkills.add(skill.name);
-      }
+    const versionMap = registryMap.get(skill.name)!;
+    if (!versionMap.has(skill.version)) {
+      const audited = enforcement === 'audited'
+        ? ((skill as Record<string, unknown>).audits as Array<{ passed: boolean }> | null)?.some(a => a.passed) ?? false
+        : false;
+      versionMap.set(skill.version, { hash: skill.content_hash, audited });
     }
   }
 
@@ -223,29 +241,31 @@ export async function verify(supabaseUrl: string, supabaseAnonKey: string): Prom
 
   process.stderr.write(`${BRAND} ${TEAL}verifying skills...${RESET}\n`);
 
-  for (const [name, localHash] of Object.entries(localHashes)) {
-    const registryHash = registryHashes.get(name);
-    if (!registryHash) {
-      process.stderr.write(`${DIM}   ${name}: ${localHash} (not in registry)${RESET}\n`);
+  for (const [name, { hash: localHash, version }] of Object.entries(localSkills)) {
+    const versionMap = registryMap.get(name);
+    const entry = versionMap?.get(version);
+
+    if (!entry) {
+      process.stderr.write(`${DIM}   ${name}@${version}: ${localHash} (not in registry)${RESET}\n`);
       if (enforcement === 'warn') {
         warnings.push({ name, reason: 'not in registry' });
-        verified[name] = localHash; // allow in warn mode
+        verified[name] = localHash;
       } else {
         rejected.push({ name, reason: 'not in registry' });
       }
-    } else if (localHash !== registryHash) {
-      process.stderr.write(`${RED}   ${name}: ${localHash} ≠ ${registryHash}${RESET}\n`);
+    } else if (localHash !== entry.hash) {
+      process.stderr.write(`${RED}   ${name}@${version}: ${localHash} ≠ ${entry.hash}${RESET}\n`);
       if (enforcement === 'warn') {
-        warnings.push({ name, reason: `content hash mismatch (local: ${localHash.slice(0, 8)}…, registry: ${registryHash.slice(0, 8)}…)` });
+        warnings.push({ name, reason: `content hash mismatch (local: ${localHash.slice(0, 8)}…, registry: ${entry.hash.slice(0, 8)}…)` });
         verified[name] = localHash;
       } else {
-        rejected.push({ name, reason: `content hash mismatch (local: ${localHash.slice(0, 8)}…, registry: ${registryHash.slice(0, 8)}…)` });
+        rejected.push({ name, reason: `content hash mismatch (local: ${localHash.slice(0, 8)}…, registry: ${entry.hash.slice(0, 8)}…)` });
       }
-    } else if (enforcement === 'audited' && !auditedSkills.has(name)) {
-      process.stderr.write(`${YELLOW}   ${name}: ${localHash} (registered but not audited)${RESET}\n`);
+    } else if (enforcement === 'audited' && !entry.audited) {
+      process.stderr.write(`${YELLOW}   ${name}@${version}: ${localHash} (registered but not audited)${RESET}\n`);
       rejected.push({ name, reason: 'no passed audit' });
     } else {
-      process.stderr.write(`${GREEN}   ${name}: ${localHash} ✓${RESET}\n`);
+      process.stderr.write(`${GREEN}   ${name}@${version}: ${localHash} ✓${RESET}\n`);
       verified[name] = localHash;
     }
   }

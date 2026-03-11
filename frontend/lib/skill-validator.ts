@@ -17,6 +17,7 @@ export interface ParsedSkill {
   compatibility: string;
   allowedTools: string;
   originalAuthor: string;
+  version: number | null;
   body: string;
 }
 
@@ -284,6 +285,22 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
   );
   const originalAuthor = String(oathboundMeta?.["original-author"] ?? "");
 
+  // Validate optional version
+  const rawVersion = meta["version"];
+  let version: number | null = null;
+  if (rawVersion != null) {
+    const parsed = Number(rawVersion);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      checks.push({
+        passed: false,
+        message: `Invalid version: "${rawVersion}" — must be a positive integer`,
+      });
+      blocking = true;
+    } else {
+      version = parsed;
+    }
+  }
+
   if (originalAuthor && !isOpenSourceLicense(license)) {
     checks.push({
       passed: false,
@@ -299,6 +316,7 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
     compatibility,
     allowedTools,
     originalAuthor,
+    version,
     body,
   };
 

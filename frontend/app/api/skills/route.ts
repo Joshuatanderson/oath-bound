@@ -20,6 +20,7 @@ interface SkillSubmission {
   compatibility: string | null;
   allowedTools: string | null;
   originalAuthor: string | null;
+  version: number | null;
   files: SkillFile[];
 }
 
@@ -105,6 +106,40 @@ export async function POST(request: Request) {
     );
   }
 
+  // Determine version: auto-increment or use explicit value
+  const { data: latestSkill } = await admin
+    .from("skills")
+    .select("version")
+    .eq("namespace", namespace)
+    .eq("name", body.name)
+    .order("version", { ascending: false })
+    .limit(1)
+    .single();
+
+  const maxExisting = latestSkill?.version ?? 0;
+  let version: number;
+
+  if (body.version != null && body.version > 0) {
+    // Explicit version requested — check for conflict
+    const { data: existing } = await admin
+      .from("skills")
+      .select("id")
+      .eq("namespace", namespace)
+      .eq("name", body.name)
+      .eq("version", body.version)
+      .single();
+
+    if (existing) {
+      return NextResponse.json(
+        { error: `Version ${body.version} already exists for ${namespace}/${body.name}` },
+        { status: 409 }
+      );
+    }
+    version = body.version;
+  } else {
+    version = maxExisting + 1;
+  }
+
   // Rewrite SKILL.md front matter with canonical form values
   const rootDir = body.files[0].path.split("/")[0];
   const skillIdx = body.files.findIndex(
@@ -118,6 +153,7 @@ export async function POST(request: Request) {
     meta["name"] = body.name;
     meta["description"] = body.description;
     meta["license"] = body.license;
+    meta["version"] = version;
 
     if (body.compatibility) {
       meta["compatibility"] = body.compatibility;
@@ -168,9 +204,6 @@ export async function POST(request: Request) {
     content: f.content,
   }));
   const contentHashValue = contentHash(hashFiles);
-
-  // Upload to storage
-  const version = 1;
   const shortHash = tarHash.slice(0, 6);
   const storagePath = `${namespace}/${body.name}/v${version}-${shortHash}.tar`;
   const { error: uploadError } = await supabase.storage
@@ -188,7 +221,7 @@ export async function POST(request: Request) {
   }
 
   // On-chain attestation
-  const subject = `skill:${namespace}/${body.name}`;
+  const subject = `skill:${namespace}/${body.name}@${version}`;
 
   let suiDigest: string | undefined;
   let suiObjectId: string | undefined;
@@ -215,6 +248,7 @@ export async function POST(request: Request) {
   const { error: insertError } = await supabase.from("skills").insert({
     name: body.name,
     namespace,
+    version,
     description: body.description,
     license,
     compatibility: body.compatibility || null,
@@ -241,6 +275,7 @@ export async function POST(request: Request) {
     ok: true,
     namespace,
     name: body.name,
+    version,
     suiDigest,
     suiObjectId,
   });

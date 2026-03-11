@@ -25,7 +25,7 @@ export { stripJsoncComments, writeOathboundConfig, mergeClaudeSettings, type Mer
 export { isNewer } from './update';
 export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult };
 
-const VERSION = '0.8.1';
+const VERSION = '0.9.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -40,10 +40,19 @@ interface SkillRow {
   storage_path: string;
 }
 
-function parseSkillArg(arg: string): { namespace: string; name: string } | null {
+function parseSkillArg(arg: string): { namespace: string; name: string; version: number | null } | null {
   const slash = arg.indexOf('/');
   if (slash < 1 || slash === arg.length - 1) return null;
-  return { namespace: arg.slice(0, slash), name: arg.slice(slash + 1) };
+  const afterSlash = arg.slice(slash + 1);
+  const atIdx = afterSlash.indexOf('@');
+  if (atIdx === -1) {
+    return { namespace: arg.slice(0, slash), name: afterSlash, version: null };
+  }
+  const name = afterSlash.slice(0, atIdx);
+  if (!name) return null;
+  const vNum = Number(afterSlash.slice(atIdx + 1));
+  if (!Number.isInteger(vNum) || vNum < 1) return null;
+  return { namespace: arg.slice(0, slash), name, version: vNum };
 }
 
 // --- Package manager detection ---
@@ -223,25 +232,30 @@ async function init(): Promise<void> {
 async function pull(skillArg: string): Promise<void> {
   const parsed = parseSkillArg(skillArg);
   if (!parsed) usage();
-  const { namespace, name } = parsed;
+  const { namespace, name, version } = parsed;
   const fullName = `${namespace}/${name}`;
 
-  console.log(`\n${BRAND} ${TEAL}↓ Pulling ${fullName}...${RESET}`);
+  console.log(`\n${BRAND} ${TEAL}↓ Pulling ${fullName}${version ? `@${version}` : ''}...${RESET}`);
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // 1. Query for the skill
-  const { data: skill, error } = await supabase
+  let query = supabase
     .from('skills')
     .select('name, namespace, version, tar_hash, storage_path')
     .eq('namespace', namespace)
-    .eq('name', name)
-    .order('version', { ascending: false })
-    .limit(1)
-    .single<SkillRow>();
+    .eq('name', name);
+
+  if (version !== null) {
+    query = query.eq('version', version);
+  } else {
+    query = query.order('version', { ascending: false }).limit(1);
+  }
+
+  const { data: skill, error } = await query.single<SkillRow>();
 
   if (error || !skill) {
-    fail(`Skill not found: ${fullName}`);
+    fail(`Skill not found: ${fullName}${version ? `@${version}` : ''}`);
   }
 
   // 2. Download the tar from storage

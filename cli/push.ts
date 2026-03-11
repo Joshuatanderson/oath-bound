@@ -33,6 +33,7 @@ export async function push(pathArg?: string): Promise<void> {
   const name = String(meta.name ?? '');
   const description = String(meta.description ?? '');
   const license = String(meta.license ?? '');
+  const version = typeof meta.version === 'number' && Number.isInteger(meta.version) && meta.version > 0 ? meta.version : null;
   if (!name) fail('SKILL.md frontmatter missing: name');
   if (!description) fail('SKILL.md frontmatter missing: description');
   if (!license) fail('SKILL.md frontmatter missing: license');
@@ -47,6 +48,7 @@ export async function push(pathArg?: string): Promise<void> {
   }));
 
   console.log(`${DIM}   name: ${name}${RESET}`);
+  console.log(`${DIM}   version: ${version ?? 'auto (next)'}${RESET}`);
   console.log(`${DIM}   license: ${license}${RESET}`);
   if (originalAuthor) {
     console.log(`${DIM}   original author: ${originalAuthor}${RESET}`);
@@ -69,6 +71,7 @@ export async function push(pathArg?: string): Promise<void> {
       name,
       description,
       license,
+      version,
       compatibility: String(meta.compatibility ?? '') || null,
       allowedTools: String(meta['allowed-tools'] ?? '') || null,
       originalAuthor: originalAuthor || null,
@@ -88,7 +91,7 @@ export async function push(pathArg?: string): Promise<void> {
 
   const result = await response.json();
 
-  outro(`${GREEN}✓ Published ${BOLD}${result.namespace}/${result.name}${RESET}`);
+  outro(`${GREEN}✓ Published ${BOLD}${result.namespace}/${result.name}${RESET}${GREEN} v${result.version}${RESET}`);
   if (result.suiObjectId) {
     console.log(`${DIM}   on-chain: ${result.suiObjectId}${RESET}`);
   }

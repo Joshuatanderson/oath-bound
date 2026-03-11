@@ -22,8 +22,8 @@ ${BOLD}oathbound${RESET} — install, verify, and publish skills
 
 ${DIM}Usage:${RESET}
   oathbound init                ${DIM}Setup wizard — configure project${RESET}
-  oathbound pull <namespace/skill-name>
-  oathbound install <namespace/skill-name>
+  oathbound pull <namespace/skill-name[@version]>
+  oathbound install <namespace/skill-name[@version]>
   oathbound push [path]         ${DIM}Publish a skill to the registry${RESET}
   oathbound login               ${DIM}Authenticate with oathbound.ai${RESET}
   oathbound logout              ${DIM}Clear stored credentials${RESET}
