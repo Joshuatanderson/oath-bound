@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getServerClient } from "@/lib/supabase.server";
 import { Card } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ExternalLink, FileCheck, ShieldCheck, ClipboardCheck } from "lucide-react";
+import { ExternalLink, FileCheck, ShieldCheck, ClipboardCheck, User } from "lucide-react";
 import { getAdminClient } from "@/lib/supabase.admin";
 import { Badge } from "@/components/ui/badge";
 import { AuditForm } from "./audit-form";
@@ -52,6 +53,16 @@ export default async function SkillPage({
   if (error || !skill) {
     notFound();
   }
+
+  // Fetch all versions of this skill
+  const { data: allVersions } = await supabase
+    .from("skills")
+    .select("id, version, created_at")
+    .eq("namespace", skill.namespace)
+    .eq("name", skill.name)
+    .order("version", { ascending: false });
+
+  const isLatest = allVersions?.[0]?.id === skill.id;
 
   const { data: audits } = await supabase
     .from("audits")
@@ -106,15 +117,21 @@ export default async function SkillPage({
         </p>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{skill.name}</h1>
-          <CopyCommand command={`npx oathbound pull ${skill.namespace}/${skill.name}`} />
+          <CopyCommand command={`npx oathbound pull ${skill.namespace}/${skill.name}${isLatest ? '' : `@${skill.version}`}`} />
         </div>
         <p className="text-base text-muted-foreground sm:text-lg">{skill.description}</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Badge variant="outline">by {skill.namespace}</Badge>
+        <Badge variant="outline" className="gap-1">
+          <ShieldCheck className="size-3 text-success" />
+          {skill.namespace}
+        </Badge>
         {skill.original_author && (
-          <Badge variant="outline">Original author: {skill.original_author}</Badge>
+          <Badge variant="outline" className="gap-1">
+            <User className="size-3" />
+            Originally by {skill.original_author}
+          </Badge>
         )}
         <Badge variant="secondary">License: {skill.license}</Badge>
         {skill.compatibility && (
@@ -129,6 +146,24 @@ export default async function SkillPage({
           </Badge>
         )}
       </div>
+
+      {allVersions && allVersions.length > 1 && (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium text-muted-foreground">Version History</h3>
+          <div className="flex flex-wrap gap-2">
+            {allVersions.map((v) => (
+              <Link
+                key={v.id}
+                href={`/skills/${v.id}`}
+                className={`text-sm ${v.id === skill.id ? 'font-bold text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                v{v.version}
+                {v.id === allVersions[0].id && ' (latest)'}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Card className="p-4">
         <h3 className="mb-1 text-sm font-medium">On-Chain Attestations</h3>
