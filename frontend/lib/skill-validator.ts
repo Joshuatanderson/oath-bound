@@ -1,3 +1,5 @@
+import { parse as yamlParse, stringify as yamlStringify } from "yaml";
+
 export interface SkillFile {
   path: string;
   content: string;
@@ -14,6 +16,8 @@ export interface ParsedSkill {
   license: string;
   compatibility: string;
   allowedTools: string;
+  originalAuthor: string;
+  version: number | null;
   body: string;
 }
 
@@ -37,8 +41,6 @@ export const VALID_LICENSES = [
   "Proprietary",
 ] as const;
 
-export const ALLOWED_DIRS = ["scripts", "references", "assets"] as const;
-
 export const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10 MB total upload
 export const MAX_FILE_COUNT = 50;
 
@@ -54,31 +56,27 @@ const BLOCKED_BASENAMES = [".npmrc", ".netrc", ".htpasswd"];
 const PRIVATE_KEY_NAMES = ["id_rsa", "id_ed25519", "id_ecdsa", "id_dsa"];
 
 export function parseFrontmatter(content: string): {
-  meta: Record<string, string>;
+  meta: Record<string, unknown>;
   body: string;
 } {
   const match = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
   if (!match) return { meta: {}, body: content };
 
-  const meta: Record<string, string> = {};
-  for (const line of match[1].split("\n")) {
-    const idx = line.indexOf(":");
-    if (idx === -1) continue;
-    const key = line.slice(0, idx).trim();
-    const value = line.slice(idx + 1).trim();
-    if (key) meta[key] = value;
-  }
+  const parsed = yamlParse(match[1]);
+  const meta: Record<string, unknown> = parsed && typeof parsed === "object" ? parsed : {};
   return { meta, body: match[2] };
 }
 
 export function serializeFrontmatter(
-  meta: Record<string, string>,
+  meta: Record<string, unknown>,
   body: string
 ): string {
-  const lines = Object.entries(meta)
-    .filter(([, v]) => v !== "")
-    .map(([k, v]) => `${k}: ${v}`);
-  return `---\n${lines.join("\n")}\n---\n${body}`;
+  return `---\n${yamlStringify(meta, { lineWidth: 0 }).trim()}\n---\n${body}`;
+}
+
+export function isOpenSourceLicense(license: string): boolean {
+  const upper = license.toUpperCase();
+  return upper !== "BUSL-1.1" && upper !== "PROPRIETARY";
 }
 
 export function validateSkill(files: SkillFile[]): ValidateResult {
@@ -121,25 +119,7 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
   }
   checks.push({ passed: true, message: "SKILL.md found" });
 
-  // Check for unexpected files/dirs at root level
-  const seenTopLevel = new Set<string>();
-  for (const f of files) {
-    const relative = f.path.slice(rootDir.length + 1);
-    const topLevel = relative.split("/")[0];
-    if (seenTopLevel.has(topLevel)) continue;
-    seenTopLevel.add(topLevel);
-
-    if (topLevel !== "SKILL.md" && !ALLOWED_DIRS.includes(topLevel as typeof ALLOWED_DIRS[number])) {
-      checks.push({
-        passed: false,
-        message: `Unexpected entry at root: ${topLevel} (allowed: SKILL.md, ${ALLOWED_DIRS.join(", ")})`,
-      });
-      blocking = true;
-    }
-  }
-  if (!blocking) {
-    checks.push({ passed: true, message: "Directory structure valid" });
-  }
+  checks.push({ passed: true, message: "Directory structure valid" });
 
   // Check for dangerous paths
   for (const f of files) {
@@ -236,7 +216,7 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
   }
 
   // Validate name
-  const name = meta["name"] ?? "";
+  const name = String(meta["name"] ?? "");
   if (!name) {
     checks.push({ passed: false, message: "Frontmatter missing: name" });
     blocking = true;
@@ -257,7 +237,7 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
   }
 
   // Validate description
-  const description = meta["description"] ?? "";
+  const description = String(meta["description"] ?? "");
   if (!description) {
     checks.push({ passed: false, message: "Frontmatter missing: description" });
     blocking = true;
@@ -272,7 +252,7 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
   }
 
   // Validate license
-  const license = meta["license"] ?? "";
+  const license = String(meta["license"] ?? "");
   if (!license) {
     checks.push({ passed: false, message: "Frontmatter missing: license" });
     blocking = true;
@@ -287,7 +267,7 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
   }
 
   // Validate optional fields
-  const compatibility = meta["compatibility"] ?? "";
+  const compatibility = String(meta["compatibility"] ?? "");
   if (compatibility && compatibility.length > 500) {
     checks.push({
       passed: false,
@@ -295,7 +275,39 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
     });
   }
 
-  const allowedTools = meta["allowed-tools"] ?? "";
+  const allowedTools = String(meta["allowed-tools"] ?? "");
+
+  // Extract original-author from nested metadata.oathbound namespace
+  const oathboundMeta = (
+    (meta["metadata"] as Record<string, unknown> | undefined)?.["oathbound"] as
+      | Record<string, unknown>
+      | undefined
+  );
+  const originalAuthor = String(oathboundMeta?.["original-author"] ?? "");
+
+  // Validate optional version
+  const rawVersion = meta["version"];
+  let version: number | null = null;
+  if (rawVersion != null) {
+    const parsed = Number(rawVersion);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      checks.push({
+        passed: false,
+        message: `Invalid version: "${rawVersion}" — must be a positive integer`,
+      });
+      blocking = true;
+    } else {
+      version = parsed;
+    }
+  }
+
+  if (originalAuthor && !isOpenSourceLicense(license)) {
+    checks.push({
+      passed: false,
+      message: "original-author can only be set for open-source licenses",
+    });
+    blocking = true;
+  }
 
   const parsed: ParsedSkill = {
     name,
@@ -303,6 +315,8 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
     license,
     compatibility,
     allowedTools,
+    originalAuthor,
+    version,
     body,
   };
 

@@ -58,7 +58,7 @@ export default function Home() {
             <div className="flex items-center gap-3 sm:gap-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/oathbound-transparent-teal-mid.svg"
+                src="/oathbound-teal-v3.svg"
                 alt=""
                 className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20"
               />
