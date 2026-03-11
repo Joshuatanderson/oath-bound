@@ -55,14 +55,14 @@ export default function Home() {
         {/* Hero */}
         <div className="flex flex-col items-center justify-center pt-24 pb-16 text-center sm:pt-32">
           <div className="flex flex-col items-center gap-4">
-            <div className="flex items-center gap-2 text-7xl">
+            <div className="flex items-center gap-3 sm:gap-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/oathbound-teal-v3.svg"
                 alt=""
-                className="h-[1em] w-auto"
+                className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20"
               />
-              <h1 className="font-extralight tracking-normal text-teal-4">
+              <h1 className="text-4xl sm:text-5xl md:text-7xl font-extralight tracking-normal text-teal-4">
                 Oathbound
               </h1>
             </div>
