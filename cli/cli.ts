@@ -16,6 +16,7 @@ import {
   type EnforcementLevel, type MergeResult,
 } from './config';
 import { checkForUpdate, isNewer } from './update';
+import { isValidSemver, compareSemver } from './semver';
 import { verify, verifyCheck, findSkillsDir } from './verify';
 import { login, logout, whoami } from './auth';
 import { push } from './push';
@@ -25,7 +26,7 @@ export { stripJsoncComments, writeOathboundConfig, mergeClaudeSettings, type Mer
 export { isNewer } from './update';
 export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult };
 
-const VERSION = '0.9.0';
+const VERSION = '0.11.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -35,12 +36,12 @@ const SUPABASE_ANON_KEY = 'sb_publishable_T-rk0azNRqAMLLGCyadyhQ_ulk9685n';
 interface SkillRow {
   name: string;
   namespace: string;
-  version: number;
+  version: string;
   tar_hash: string;
   storage_path: string;
 }
 
-function parseSkillArg(arg: string): { namespace: string; name: string; version: number | null } | null {
+function parseSkillArg(arg: string): { namespace: string; name: string; version: string | null } | null {
   const slash = arg.indexOf('/');
   if (slash < 1 || slash === arg.length - 1) return null;
   const afterSlash = arg.slice(slash + 1);
@@ -50,9 +51,9 @@ function parseSkillArg(arg: string): { namespace: string; name: string; version:
   }
   const name = afterSlash.slice(0, atIdx);
   if (!name) return null;
-  const vNum = Number(afterSlash.slice(atIdx + 1));
-  if (!Number.isInteger(vNum) || vNum < 1) return null;
-  return { namespace: arg.slice(0, slash), name, version: vNum };
+  const vStr = afterSlash.slice(atIdx + 1);
+  if (!isValidSemver(vStr)) return null;
+  return { namespace: arg.slice(0, slash), name, version: vStr };
 }
 
 // --- Package manager detection ---
@@ -240,22 +241,33 @@ async function pull(skillArg: string): Promise<void> {
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // 1. Query for the skill
-  let query = supabase
-    .from('skills')
-    .select('name, namespace, version, tar_hash, storage_path')
-    .eq('namespace', namespace)
-    .eq('name', name);
+  let skill: SkillRow;
 
   if (version !== null) {
-    query = query.eq('version', version);
+    const { data, error } = await supabase
+      .from('skills')
+      .select('name, namespace, version, tar_hash, storage_path')
+      .eq('namespace', namespace)
+      .eq('name', name)
+      .eq('version', version)
+      .single<SkillRow>();
+
+    if (error || !data) {
+      fail(`Skill not found: ${fullName}@${version}`);
+    }
+    skill = data;
   } else {
-    query = query.order('version', { ascending: false }).limit(1);
-  }
+    // Fetch all versions, pick highest via semver comparison
+    const { data, error } = await supabase
+      .from('skills')
+      .select('name, namespace, version, tar_hash, storage_path')
+      .eq('namespace', namespace)
+      .eq('name', name);
 
-  const { data: skill, error } = await query.single<SkillRow>();
-
-  if (error || !skill) {
-    fail(`Skill not found: ${fullName}${version ? `@${version}` : ''}`);
+    if (error || !data || data.length === 0) {
+      fail(`Skill not found: ${fullName}`);
+    }
+    skill = (data as SkillRow[]).sort((a, b) => compareSemver(a.version, b.version)).at(-1)!;
   }
 
   // 2. Download the tar from storage
@@ -361,7 +373,10 @@ if (subcommand === 'init') {
     fail('Failed', msg);
   });
 } else if (subcommand === 'push') {
-  push(args[1]).catch((err: unknown) => {
+  const pushArgs = args.slice(1);
+  const isPrivate = pushArgs.includes('--private');
+  const pushPath = pushArgs.find(a => !a.startsWith('--'));
+  push(pushPath, { private: isPrivate }).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Push failed', msg);
   });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getServerClient } from "@/lib/supabase.server";
+import { compareSemver } from "@/lib/semver";
 import { Card } from "@/components/ui/card";
 import {
   Accordion,
@@ -8,7 +9,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ExternalLink, FileCheck, ShieldCheck, ClipboardCheck, User } from "lucide-react";
+import { ExternalLink, FileCheck, ShieldCheck, ClipboardCheck, User, Lock } from "lucide-react";
 import { getAdminClient } from "@/lib/supabase.admin";
 import { Badge } from "@/components/ui/badge";
 import { AuditForm } from "./audit-form";
@@ -45,7 +46,7 @@ export default async function SkillPage({
   const { data: skill, error } = await supabase
     .from("skills")
     .select(
-      "id, name, namespace, description, license, version, compatibility, allowed_tools, created_at, user_id, sui_digest, sui_object_id, original_author"
+      "id, name, namespace, description, license, version, compatibility, allowed_tools, created_at, user_id, sui_digest, sui_object_id, original_author, visibility"
     )
     .eq("id", id)
     .single();
@@ -54,13 +55,16 @@ export default async function SkillPage({
     notFound();
   }
 
-  // Fetch all versions of this skill
-  const { data: allVersions } = await supabase
+  // Fetch all versions of this skill (sorted by semver descending in app code)
+  const { data: allVersionsRaw } = await supabase
     .from("skills")
     .select("id, version, created_at")
     .eq("namespace", skill.namespace)
-    .eq("name", skill.name)
-    .order("version", { ascending: false });
+    .eq("name", skill.name);
+
+  const allVersions = allVersionsRaw?.sort((a, b) =>
+    compareSemver(b.version, a.version)
+  );
 
   const isLatest = allVersions?.[0]?.id === skill.id;
 
@@ -127,6 +131,12 @@ export default async function SkillPage({
           <ShieldCheck className="size-3 text-success" />
           {skill.namespace}
         </Badge>
+        {skill.visibility === 'private' && (
+          <Badge variant="outline" className="gap-1 border-teal-500/30 text-teal-600 dark:text-teal-400">
+            <Lock className="size-3" />
+            Private
+          </Badge>
+        )}
         {skill.original_author && (
           <Badge variant="outline" className="gap-1">
             <User className="size-3" />

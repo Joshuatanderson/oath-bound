@@ -9,6 +9,7 @@ import {
   serializeFrontmatter,
   validateSkill,
 } from "@/lib/skill-validator";
+import { isValidSemver, compareSemver, bumpPatch } from "@/lib/semver";
 import { ensureChainWrite, registerSkill } from "@/lib/sui";
 import type { SkillFile } from "@/lib/skill-validator";
 import type { Database } from "@/lib/database.types";
@@ -20,7 +21,8 @@ interface SkillSubmission {
   compatibility: string | null;
   allowedTools: string | null;
   originalAuthor: string | null;
-  version: number | null;
+  version: string | null;
+  visibility: "public" | "private" | null;
   files: SkillFile[];
 }
 
@@ -106,30 +108,25 @@ export async function POST(request: Request) {
     );
   }
 
-  // Determine version: auto-increment or use explicit value
-  const { data: latestSkill } = await admin
+  // Determine version: auto-bump patch or use explicit semver
+  const { data: existingVersions } = await admin
     .from("skills")
     .select("version")
     .eq("namespace", namespace)
-    .eq("name", body.name)
-    .order("version", { ascending: false })
-    .limit(1)
-    .single();
+    .eq("name", body.name);
 
-  const maxExisting = latestSkill?.version ?? 0;
-  let version: number;
+  let version: string;
 
-  if (body.version != null && body.version > 0) {
-    // Explicit version requested — check for conflict
-    const { data: existing } = await admin
-      .from("skills")
-      .select("id")
-      .eq("namespace", namespace)
-      .eq("name", body.name)
-      .eq("version", body.version)
-      .single();
+  if (body.version != null && body.version !== "") {
+    if (!isValidSemver(body.version)) {
+      return NextResponse.json(
+        { error: `Invalid version "${body.version}" — must be semver (e.g. 1.0.0)` },
+        { status: 400 }
+      );
+    }
 
-    if (existing) {
+    const conflict = existingVersions?.find((v) => v.version === body.version);
+    if (conflict) {
       return NextResponse.json(
         { error: `Version ${body.version} already exists for ${namespace}/${body.name}` },
         { status: 409 }
@@ -137,7 +134,15 @@ export async function POST(request: Request) {
     }
     version = body.version;
   } else {
-    version = maxExisting + 1;
+    // Auto: find highest existing version, bump patch
+    if (!existingVersions || existingVersions.length === 0) {
+      version = "0.1.0";
+    } else {
+      const sorted = existingVersions
+        .map((v) => v.version)
+        .sort(compareSemver);
+      version = bumpPatch(sorted[sorted.length - 1]);
+    }
   }
 
   // Rewrite SKILL.md front matter with canonical form values
@@ -258,6 +263,7 @@ export async function POST(request: Request) {
     tar_hash: tarHash,
     content_hash: contentHashValue,
     user_id: userRecord.id,
+    visibility: body.visibility ?? "public",
     sui_digest: suiDigest,
     sui_object_id: suiObjectId,
   });

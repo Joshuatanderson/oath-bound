@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, ExternalLink, ShieldCheck } from "lucide-react";
+import { Loader2, ExternalLink, ShieldCheck, Lock } from "lucide-react";
 import {
   validateSkill,
   VALID_LICENSES,
@@ -82,6 +82,7 @@ export default function SubmitPage() {
   const [allowedTools, setAllowedTools] = useState("");
   const [skillBody, setSkillBody] = useState("");
   const [originalAuthor, setOriginalAuthor] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
 
   const originalAuthorError = originalAuthor.trim() !== "" && license !== "" && !isOpenSourceLicense(license)
     ? "Original author can only be set for open-source licenses"
@@ -261,6 +262,7 @@ export default function SubmitPage() {
           compatibility: compatibility || null,
           allowedTools: allowedTools || null,
           originalAuthor: originalAuthor.trim() || null,
+          visibility: isPrivate ? "private" : "public",
           files: upload.files,
         }),
       });
@@ -547,6 +549,21 @@ export default function SubmitPage() {
             <p className="text-xs text-muted-foreground">
               Space-delimited list (experimental).
             </p>
+          </div>
+
+          {/* Private toggle */}
+          <div className="flex items-center gap-3">
+            <label htmlFor="skill-private" className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                id="skill-private"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              <Lock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">Private skill — Only visible to you</span>
+            </label>
           </div>
 
           {/* Skill body preview */}

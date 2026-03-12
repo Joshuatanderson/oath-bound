@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getServerClient } from "@/lib/supabase.server";
+import { compareSemver } from "@/lib/semver";
 import {
   Card,
   CardHeader,
@@ -8,7 +9,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, FileCheck, User } from "lucide-react";
+import { ShieldCheck, FileCheck, User, Lock } from "lucide-react";
 
 export default async function SkillsPage() {
   const supabase = await getServerClient();
@@ -17,7 +18,7 @@ export default async function SkillsPage() {
     .from("skills")
     .select(
       `
-      id, name, description, namespace, version, original_author,
+      id, name, description, namespace, version, original_author, visibility,
       users (username, display_name, identity_verifications (status)),
       audits (id, passed)
     `
@@ -40,7 +41,7 @@ export default async function SkillsPage() {
   for (const skill of skills) {
     const key = `${skill.namespace}/${skill.name}`;
     const existing = seen.get(key);
-    if (!existing || skill.version > existing.version) {
+    if (!existing || compareSemver(skill.version, existing.version) > 0) {
       seen.set(key, skill);
     }
   }
@@ -67,7 +68,7 @@ export default async function SkillsPage() {
 
             return (
               <Link key={skill.id} href={`/skills/${skill.id}`}>
-                <Card className="h-full transition-colors hover:bg-muted/50">
+                <Card className={`h-full transition-colors hover:bg-muted/50 ${skill.visibility === 'private' ? 'border-2 border-teal-500/50' : ''}`}>
                   <CardHeader>
                     <CardTitle>{skill.name}</CardTitle>
                     <CardDescription className="line-clamp-2">
@@ -92,6 +93,13 @@ export default async function SkillsPage() {
                             <User className="size-3" />
                             <span>Originally by {skill.original_author}</span>
                           </span>
+                        )}
+
+                        {skill.visibility === 'private' && (
+                          <Badge variant="outline" className="gap-1 border-teal-500/30 text-teal-600 dark:text-teal-400">
+                            <Lock className="size-3" />
+                            Private
+                          </Badge>
                         )}
 
                         {hasAnyAudit && (

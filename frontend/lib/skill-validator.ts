@@ -1,4 +1,5 @@
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
+import { isValidSemver } from "./semver";
 
 export interface SkillFile {
   path: string;
@@ -17,7 +18,7 @@ export interface ParsedSkill {
   compatibility: string;
   allowedTools: string;
   originalAuthor: string;
-  version: number | null;
+  version: string | null;
   body: string;
 }
 
@@ -285,19 +286,19 @@ export function validateSkill(files: SkillFile[]): ValidateResult {
   );
   const originalAuthor = String(oathboundMeta?.["original-author"] ?? "");
 
-  // Validate optional version
+  // Validate optional version (semver: MAJOR.MINOR.PATCH)
   const rawVersion = meta["version"];
-  let version: number | null = null;
+  let version: string | null = null;
   if (rawVersion != null) {
-    const parsed = Number(rawVersion);
-    if (!Number.isInteger(parsed) || parsed < 1) {
+    const vStr = String(rawVersion);
+    if (!isValidSemver(vStr)) {
       checks.push({
         passed: false,
-        message: `Invalid version: "${rawVersion}" — must be a positive integer`,
+        message: `Invalid version: "${rawVersion}" — must be semver (e.g. 1.0.0)`,
       });
       blocking = true;
     } else {
-      version = parsed;
+      version = vStr;
     }
   }
 

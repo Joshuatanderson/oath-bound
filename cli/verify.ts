@@ -9,6 +9,7 @@ import { parse as yamlParse } from 'yaml';
 import { BRAND, TEAL, GREEN, RED, YELLOW, DIM, BOLD, RESET } from './ui';
 import { hashSkillDir } from './content-hash';
 import { readOathboundConfig, type EnforcementLevel } from './config';
+import { isValidSemver } from './semver';
 
 // --- Session state file ---
 interface SessionState {
@@ -138,7 +139,7 @@ function isExternalSkillAccess(
   return false;
 }
 
-function parseSkillVersion(skillDir: string): number | null {
+function parseSkillVersion(skillDir: string): string | null {
   const skillMdPath = join(skillDir, 'SKILL.md');
   if (!existsSync(skillMdPath)) return null;
   const content = readFileSync(skillMdPath, 'utf-8');
@@ -147,7 +148,9 @@ function parseSkillVersion(skillDir: string): number | null {
   try {
     const parsed = yamlParse(match[1]);
     const v = parsed?.version;
-    return typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : null;
+    if (v == null) return null;
+    const vStr = String(v);
+    return isValidSemver(vStr) ? vStr : null;
   } catch {
     return null;
   }
@@ -191,11 +194,11 @@ export async function verify(supabaseUrl: string, supabaseAnonKey: string): Prom
   }
 
   // Hash each local skill and parse version from SKILL.md
-  const localSkills: Record<string, { hash: string; version: number }> = {};
+  const localSkills: Record<string, { hash: string; version: string }> = {};
   for (const dir of skillDirs) {
     const fullPath = join(skillsDir, dir.name);
     const hash = hashSkillDir(fullPath);
-    const version = parseSkillVersion(fullPath) ?? 1; // fallback to v1 for pre-versioning installs
+    const version = parseSkillVersion(fullPath) ?? "1.0.0"; // fallback for pre-semver installs
     localSkills[dir.name] = { hash, version };
   }
 
@@ -220,7 +223,7 @@ export async function verify(supabaseUrl: string, supabaseAnonKey: string): Prom
   }
 
   // Build lookup: name → version → { hash, audited }
-  const registryMap = new Map<string, Map<number, { hash: string; audited: boolean }>>();
+  const registryMap = new Map<string, Map<string, { hash: string; audited: boolean }>>();
   for (const skill of skills ?? []) {
     if (!skill.content_hash) continue;
     if (!registryMap.has(skill.name)) {

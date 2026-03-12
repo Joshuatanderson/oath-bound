@@ -5,10 +5,11 @@ import { parse as yamlParse } from 'yaml';
 import { BRAND, GREEN, DIM, BOLD, RESET, fail, spinner } from './ui';
 import { getAccessToken } from './auth';
 import { collectFiles } from './content-hash';
+import { isValidSemver } from './semver';
 
 const API_BASE = process.env.OATHBOUND_API_URL ?? 'https://www.oathbound.ai';
 
-export async function push(pathArg?: string): Promise<void> {
+export async function push(pathArg?: string, options?: { private?: boolean }): Promise<void> {
   intro(BRAND);
 
   // Resolve skill directory
@@ -33,7 +34,8 @@ export async function push(pathArg?: string): Promise<void> {
   const name = String(meta.name ?? '');
   const description = String(meta.description ?? '');
   const license = String(meta.license ?? '');
-  const version = typeof meta.version === 'number' && Number.isInteger(meta.version) && meta.version > 0 ? meta.version : null;
+  const rawVersion = meta.version != null ? String(meta.version) : null;
+  const version = rawVersion && isValidSemver(rawVersion) ? rawVersion : null;
   if (!name) fail('SKILL.md frontmatter missing: name');
   if (!description) fail('SKILL.md frontmatter missing: description');
   if (!license) fail('SKILL.md frontmatter missing: license');
@@ -52,6 +54,10 @@ export async function push(pathArg?: string): Promise<void> {
   console.log(`${DIM}   license: ${license}${RESET}`);
   if (originalAuthor) {
     console.log(`${DIM}   original author: ${originalAuthor}${RESET}`);
+  }
+  const visibility = options?.private ? 'private' : 'public';
+  if (options?.private) {
+    console.log(`${DIM}   visibility: ${BOLD}private${RESET}`);
   }
   console.log(`${DIM}   ${files.length} file(s)${RESET}`);
 
@@ -75,6 +81,7 @@ export async function push(pathArg?: string): Promise<void> {
       compatibility: String(meta.compatibility ?? '') || null,
       allowedTools: String(meta['allowed-tools'] ?? '') || null,
       originalAuthor: originalAuthor || null,
+      visibility,
       files,
     }),
   });

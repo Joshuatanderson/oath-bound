@@ -138,7 +138,8 @@ export type Database = {
           tar_hash: string
           updated_at: string | null
           user_id: string
-          version: number
+          version: string
+          visibility: string
         }
         Insert: {
           allowed_tools?: string | null
@@ -157,7 +158,8 @@ export type Database = {
           tar_hash: string
           updated_at?: string | null
           user_id: string
-          version?: number
+          version?: string
+          visibility?: string
         }
         Update: {
           allowed_tools?: string | null
@@ -176,7 +178,8 @@ export type Database = {
           tar_hash?: string
           updated_at?: string | null
           user_id?: string
-          version?: number
+          version?: string
+          visibility?: string
         }
         Relationships: [
           {
