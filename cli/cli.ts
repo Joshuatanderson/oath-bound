@@ -24,9 +24,9 @@ import { push } from './push';
 // Re-exports for tests
 export { stripJsoncComments, writeOathboundConfig, mergeClaudeSettings, type MergeResult } from './config';
 export { isNewer } from './update';
-export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult };
+export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult, addTrustedDependency, type TrustedDepResult };
 
-const VERSION = '0.11.0';
+const VERSION = '0.11.1';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -104,6 +104,27 @@ function setup(): void {
     process.stderr.write('oathbound setup: .claude/settings.json is malformed — hooks not installed\n');
     process.exit(1);
   }
+}
+
+type TrustedDepResult = 'added' | 'skipped';
+
+function addTrustedDependency(): TrustedDepResult {
+  const pkgPath = join(process.cwd(), 'package.json');
+  if (!existsSync(pkgPath)) return 'skipped';
+
+  let pkg: Record<string, unknown>;
+  try {
+    pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+  } catch {
+    return 'skipped';
+  }
+
+  const trusted = Array.isArray(pkg.trustedDependencies) ? pkg.trustedDependencies as string[] : [];
+  if (trusted.includes('oathbound')) return 'skipped';
+
+  pkg.trustedDependencies = [...trusted, 'oathbound'];
+  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+  return 'added';
 }
 
 type PrepareResult = 'added' | 'appended' | 'skipped';
@@ -192,6 +213,15 @@ async function init(): Promise<void> {
     case 'no-package-json':
       process.stderr.write(`${RED} ✗ package.json was created but could not be found — something went wrong${RESET}\n`);
       process.exit(1);
+  }
+
+  // For bun/pnpm: add trustedDependencies so postinstall runs
+  const pm = detectPackageManager();
+  if (pm === 'bun' || pm === 'pnpm') {
+    const trustResult = addTrustedDependency();
+    if (trustResult === 'added') {
+      process.stderr.write(`${GREEN} ✓ Added oathbound to trustedDependencies (required by ${pm})${RESET}\n`);
+    }
   }
 
   // Add prepare script to package.json
