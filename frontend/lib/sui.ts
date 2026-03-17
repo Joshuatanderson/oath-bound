@@ -142,6 +142,22 @@ export async function registerPersona(
   return executeAttestation(tx);
 }
 
+export async function registerFounder(
+  subject: string,
+  bypassHash: string
+): Promise<AttestationResult> {
+  const tx = new Transaction();
+  tx.moveCall({
+    target: `${PACKAGE_ID}::registrations::register_founder`,
+    arguments: [
+      tx.object(ADMIN_CAP_ID),
+      tx.pure.vector("u8", sha256(subject)),
+      tx.pure.vector("u8", hexToBytes(bypassHash)),
+    ],
+  });
+  return executeAttestation(tx);
+}
+
 export async function registerAuthorship(
   subject: string,
   authorSubject: string

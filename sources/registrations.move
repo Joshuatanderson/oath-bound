@@ -49,6 +49,17 @@ module oathbound::registrations {
                vector[], persona_hash, b"".to_string(), ctx);
     }
 
+    /// Register founder-verified identity. Evidence = hash of bypass identifier.
+    public fun register_founder(
+        admin: &AdminCap,
+        subject: vector<u8>,
+        bypass_hash: vector<u8>,
+        ctx: &mut TxContext,
+    ) {
+        create(admin, subject, b"founder_verified".to_string(),
+               vector[], bypass_hash, b"".to_string(), ctx);
+    }
+
     /// Link a skill to its author. Target = author's subject hash.
     public fun register_authorship(
         admin: &AdminCap,

@@ -35,5 +35,6 @@ export async function GET() {
     verified: verification?.status === "approved",
     verificationStatus: verification?.status ?? null,
     hasUsername: !!userData?.username,
+    bypassAvailable: !!process.env.FOUNDER_BYPASS_PASSWORD,
   });
 }

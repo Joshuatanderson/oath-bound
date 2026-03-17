@@ -3,6 +3,6 @@
 {
   "$schema": "https://oathbound.ai/schemas/config-v1.json",
   "version": 1,
-  "enforcement": "registered",
+  "enforcement": "warn",
   "org": null
 }

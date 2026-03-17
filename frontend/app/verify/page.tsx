@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Loader2, ShieldCheck, ShieldX, ArrowLeft } from "lucide-react";
 import { getBrowserClient } from "@/lib/supabase.client";
 
@@ -29,6 +30,9 @@ function VerifyContent() {
   const [state, setState] = useState<VerifyState>("loading");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [bypassAvailable, setBypassAvailable] = useState(false);
+  const [bypassPassword, setBypassPassword] = useState("");
+  const [bypassLoading, setBypassLoading] = useState(false);
 
   // On mount: check auth + verification status
   useEffect(() => {
@@ -46,6 +50,7 @@ function VerifyContent() {
             setState("ready");
             return;
           }
+          if (d.bypassAvailable) setBypassAvailable(true);
           if (d.verified) {
             router.replace(returnTo);
             return;
@@ -130,6 +135,35 @@ function VerifyContent() {
     }
   }, [userId, router]);
 
+  const submitBypass = useCallback(async () => {
+    setBypassLoading(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/verify/bypass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: bypassPassword }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorMsg(data.error ?? "Bypass verification failed");
+        setState("error");
+        return;
+      }
+
+      if (data.status === "approved") {
+        setState("approved");
+        router.replace(returnTo);
+      }
+    } catch {
+      setErrorMsg("Network error. Please try again.");
+      setState("error");
+    } finally {
+      setBypassLoading(false);
+    }
+  }, [bypassPassword, router, returnTo]);
+
   if (state === "loading") {
     return (
       <main className="mx-auto flex w-full max-w-md flex-col items-center gap-6 px-6 py-20">
@@ -206,9 +240,42 @@ function VerifyContent() {
       )}
 
       {state === "ready" && (
-        <Button size="lg" onClick={startVerification}>
-          Start verification
-        </Button>
+        <>
+          <Button size="lg" onClick={startVerification}>
+            Start verification
+          </Button>
+
+          {bypassAvailable && (
+            <div className="flex flex-col gap-3 border-t pt-6">
+              <h2 className="text-sm font-medium">Founder access</h2>
+              <p className="text-sm text-muted-foreground">
+                If you were given a founder password, enter it here to skip ID
+                verification.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={bypassPassword}
+                  onChange={(e) => setBypassPassword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && bypassPassword) submitBypass();
+                  }}
+                />
+                <Button
+                  onClick={submitBypass}
+                  disabled={!bypassPassword || bypassLoading}
+                >
+                  {bypassLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Verify"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {state === "verifying" && (
