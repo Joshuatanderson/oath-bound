@@ -65,7 +65,10 @@ export default function SubmitPage() {
       if (data.user) {
         fetch("/api/verify/status")
           .then((r) => (r.ok ? r.json() : null))
-          .then((d) => setVerified(d?.verified ?? false))
+          .then((d) => {
+            setVerified(d?.verified ?? false);
+            if (d?.bypassAvailable) setBypassAvailable(true);
+          })
           .catch(() => setVerified(false))
           .finally(() => setAuthLoading(false));
       } else {
@@ -237,6 +240,12 @@ export default function SubmitPage() {
   const [suiDigest, setSuiDigest] = useState<string | null>(null);
   const [suiObjectId, setSuiObjectId] = useState<string | null>(null);
 
+  // Founder bypass
+  const [bypassAvailable, setBypassAvailable] = useState(false);
+  const [bypassPassword, setBypassPassword] = useState("");
+  const [bypassLoading, setBypassLoading] = useState(false);
+  const [bypassError, setBypassError] = useState<string | null>(null);
+
   const canSubmit =
     name.trim() !== "" &&
     description.trim() !== "" &&
@@ -315,6 +324,70 @@ export default function SubmitPage() {
             <ShieldCheck className="mr-2 h-4 w-4" />
             Verify identity
           </Button>
+
+          {bypassAvailable && (
+            <div className="flex flex-col gap-3 border-t pt-6">
+              <h2 className="text-sm font-medium">Founder access</h2>
+              <p className="text-sm text-muted-foreground">
+                If you were given a founder password, enter it here to skip ID
+                verification.
+              </p>
+              {bypassError && (
+                <p className="text-sm text-destructive">{bypassError}</p>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={bypassPassword}
+                  onChange={(e) => setBypassPassword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && bypassPassword) {
+                      setBypassLoading(true);
+                      setBypassError(null);
+                      fetch("/api/verify/bypass", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ password: bypassPassword }),
+                      })
+                        .then((r) => r.json())
+                        .then((d) => {
+                          if (d.status === "approved") setVerified(true);
+                          else setBypassError(d.error ?? "Bypass failed");
+                        })
+                        .catch(() => setBypassError("Network error"))
+                        .finally(() => setBypassLoading(false));
+                    }
+                  }}
+                />
+                <Button
+                  disabled={!bypassPassword || bypassLoading}
+                  onClick={() => {
+                    setBypassLoading(true);
+                    setBypassError(null);
+                    fetch("/api/verify/bypass", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ password: bypassPassword }),
+                    })
+                      .then((r) => r.json())
+                      .then((d) => {
+                        if (d.status === "approved") setVerified(true);
+                        else setBypassError(d.error ?? "Bypass failed");
+                      })
+                      .catch(() => setBypassError("Network error"))
+                      .finally(() => setBypassLoading(false));
+                  }}
+                >
+                  {bypassLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Submit"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
