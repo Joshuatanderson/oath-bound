@@ -52,6 +52,7 @@ your context is critical. Do not pollute it.
 
 ## Context for deployment
 - you are deployed at oathbound.ai
+- **Vercel project**: `oath-bound` (project ID: `prj_AlFZfG7xkow1UaQC6y8SghFwMiXN`, org: `josh-personal`). The `.vercel/project.json` at repo root links to this project. The root directory in Vercel is set to `frontend/`. **Never deploy from `frontend/` directly** — always deploy from the repo root. Never create a new Vercel project link; use the existing one.
 
 ## Error handling
 DO NOT silently swallow errors. This is an extremely early stage product. Errors should be gracefully handled, but they should always be visible to the developer and log visibly.

@@ -6,15 +6,41 @@ import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import { createHash } from "crypto";
 
-// --- Singletons ---
+// --- Lazy singletons (avoid crashing at build time when env vars are absent) ---
 
-const client = new SuiJsonRpcClient({
-  url: getJsonRpcFullnodeUrl("testnet"),
-  network: "testnet",
-});
-const keypair = Ed25519Keypair.fromSecretKey(process.env.SUI_SECRET_KEY!);
-const PACKAGE_ID = process.env.SUI_PACKAGE_ID!;
-const ADMIN_CAP_ID = process.env.SUI_ADMIN_CAP_ID!;
+let _client: SuiJsonRpcClient | null = null;
+let _keypair: Ed25519Keypair | null = null;
+
+function getClient(): SuiJsonRpcClient {
+  if (!_client) {
+    _client = new SuiJsonRpcClient({
+      url: getJsonRpcFullnodeUrl("testnet"),
+      network: "testnet",
+    });
+  }
+  return _client;
+}
+
+function getKeypair(): Ed25519Keypair {
+  if (!_keypair) {
+    const key = process.env.SUI_SECRET_KEY;
+    if (!key) throw new Error("SUI_SECRET_KEY is not set");
+    _keypair = Ed25519Keypair.fromSecretKey(key);
+  }
+  return _keypair;
+}
+
+function getPackageId(): string {
+  const id = process.env.SUI_PACKAGE_ID;
+  if (!id) throw new Error("SUI_PACKAGE_ID is not set");
+  return id;
+}
+
+function getAdminCapId(): string {
+  const id = process.env.SUI_ADMIN_CAP_ID;
+  if (!id) throw new Error("SUI_ADMIN_CAP_ID is not set");
+  return id;
+}
 
 // --- Types ---
 
@@ -42,9 +68,9 @@ export function sha256(input: string): number[] {
 
 /** Sign, execute, and extract digest + created object ID */
 async function executeAttestation(tx: Transaction): Promise<AttestationResult> {
-  const result = await client.signAndExecuteTransaction({
+  const result = await getClient().signAndExecuteTransaction({
     transaction: tx,
-    signer: keypair,
+    signer: getKeypair(),
     options: { showEffects: true },
   });
 
@@ -67,7 +93,7 @@ export async function ensureChainWrite(
   chainFn: () => Promise<AttestationResult>
 ): Promise<AttestationResult> {
   const result = await chainFn();
-  await client.waitForTransaction({ digest: result.digest });
+  await getClient().waitForTransaction({ digest: result.digest });
   return result;
 }
 
@@ -79,9 +105,9 @@ export async function registerSkill(
 ): Promise<AttestationResult> {
   const tx = new Transaction();
   tx.moveCall({
-    target: `${PACKAGE_ID}::registrations::register_skill`,
+    target: `${getPackageId()}::registrations::register_skill`,
     arguments: [
-      tx.object(ADMIN_CAP_ID),
+      tx.object(getAdminCapId()),
       tx.pure.vector("u8", sha256(subject)),
       tx.pure.vector("u8", hexToBytes(skillHash)),
       tx.pure.string(""),
@@ -98,9 +124,9 @@ export async function registerAudit(
 ): Promise<AttestationResult> {
   const tx = new Transaction();
   tx.moveCall({
-    target: `${PACKAGE_ID}::registrations::register_audit`,
+    target: `${getPackageId()}::registrations::register_audit`,
     arguments: [
-      tx.object(ADMIN_CAP_ID),
+      tx.object(getAdminCapId()),
       tx.pure.vector("u8", sha256(subject)),
       tx.pure.vector("u8", hexToBytes(skillHash)),
       tx.pure.vector("u8", hexToBytes(reportHash)),
@@ -116,9 +142,9 @@ export async function registerAuthor(
 ): Promise<AttestationResult> {
   const tx = new Transaction();
   tx.moveCall({
-    target: `${PACKAGE_ID}::registrations::register_author`,
+    target: `${getPackageId()}::registrations::register_author`,
     arguments: [
-      tx.object(ADMIN_CAP_ID),
+      tx.object(getAdminCapId()),
       tx.pure.vector("u8", sha256(subject)),
       tx.pure.string(uri),
     ],
@@ -132,9 +158,9 @@ export async function registerPersona(
 ): Promise<AttestationResult> {
   const tx = new Transaction();
   tx.moveCall({
-    target: `${PACKAGE_ID}::registrations::register_persona`,
+    target: `${getPackageId()}::registrations::register_persona`,
     arguments: [
-      tx.object(ADMIN_CAP_ID),
+      tx.object(getAdminCapId()),
       tx.pure.vector("u8", sha256(subject)),
       tx.pure.vector("u8", hexToBytes(personaHash)),
     ],
@@ -148,9 +174,9 @@ export async function registerFounder(
 ): Promise<AttestationResult> {
   const tx = new Transaction();
   tx.moveCall({
-    target: `${PACKAGE_ID}::registrations::register_founder`,
+    target: `${getPackageId()}::registrations::register_founder`,
     arguments: [
-      tx.object(ADMIN_CAP_ID),
+      tx.object(getAdminCapId()),
       tx.pure.vector("u8", sha256(subject)),
       tx.pure.vector("u8", hexToBytes(bypassHash)),
     ],
@@ -164,9 +190,9 @@ export async function registerAuthorship(
 ): Promise<AttestationResult> {
   const tx = new Transaction();
   tx.moveCall({
-    target: `${PACKAGE_ID}::registrations::register_authorship`,
+    target: `${getPackageId()}::registrations::register_authorship`,
     arguments: [
-      tx.object(ADMIN_CAP_ID),
+      tx.object(getAdminCapId()),
       tx.pure.vector("u8", sha256(subject)),
       tx.pure.vector("u8", sha256(authorSubject)),
     ],
