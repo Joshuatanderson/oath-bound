@@ -1,7 +1,7 @@
 {
   "name": "oathbound",
-  "version": "0.12.0",
-  "description": "Install verified Claude Code skills from the Oath Bound registry",
+  "version": "0.13.0",
+  "description": "Install verified Claude Code skills and agents from the Oath Bound registry",
   "license": "BUSL-1.1",
   "author": "Josh Anderson",
   "homepage": "https://oathbound.ai",
@@ -32,6 +32,8 @@
     "auth.ts",
     "push.ts",
     "search.ts",
+    "agent-push.ts",
+    "agent-search.ts",
     "semver.ts",
     "bin/cli.cjs",
     "install.cjs"

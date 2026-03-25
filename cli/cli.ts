@@ -10,7 +10,7 @@ import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { intro, outro, select, confirm, cancel, isCancel } from '@clack/prompts';
 
-import { BRAND, TEAL, GREEN, RED, YELLOW, DIM, BOLD, RESET, usage, fail, spinner } from './ui';
+import { BRAND, TEAL, GREEN, RED, YELLOW, DIM, BOLD, RESET, usage, agentUsage, fail, spinner } from './ui';
 import {
   stripJsoncComments, writeOathboundConfig, mergeClaudeSettings,
   type EnforcementLevel, type MergeResult,
@@ -21,13 +21,15 @@ import { verify, verifyCheck, findSkillsDir } from './verify';
 import { login, logout, whoami } from './auth';
 import { push } from './push';
 import { search, parseSearchArgs } from './search';
+import { agentPush } from './agent-push';
+import { agentSearch, parseAgentSearchArgs } from './agent-search';
 
 // Re-exports for tests
 export { stripJsoncComments, writeOathboundConfig, mergeClaudeSettings, type MergeResult } from './config';
 export { isNewer } from './update';
 export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult, addTrustedDependency, type TrustedDepResult };
 
-const VERSION = '0.12.0';
+const VERSION = '0.13.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -350,6 +352,131 @@ async function pull(skillArg: string): Promise<void> {
   console.log(`${DIM}   → ${join(skillsDir, name)}${RESET}`);
 }
 
+// --- Agent types ---
+interface AgentRow {
+  name: string;
+  namespace: string;
+  version: string;
+  content_hash: string;
+  storage_path: string;
+  config: Record<string, unknown> | null;
+}
+
+// --- Agent pull ---
+async function agentPull(agentArg: string): Promise<void> {
+  const parsed = parseSkillArg(agentArg); // Same namespace/name[@version] format
+  if (!parsed) usage();
+  const { namespace, name, version } = parsed;
+  const fullName = `${namespace}/${name}`;
+
+  console.log(`\n${BRAND} ${TEAL}↓ Pulling agent ${fullName}${version ? `@${version}` : ''}...${RESET}`);
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Query for the agent
+  let agent: AgentRow;
+
+  if (version !== null) {
+    const { data, error } = await supabase
+      .from('agents')
+      .select('name, namespace, version, content_hash, storage_path, config')
+      .eq('namespace', namespace)
+      .eq('name', name)
+      .eq('version', version)
+      .single<AgentRow>();
+
+    if (error || !data) {
+      fail(`Agent not found: ${fullName}@${version}`);
+    }
+    agent = data;
+  } else {
+    const { data, error } = await supabase
+      .from('agents')
+      .select('name, namespace, version, content_hash, storage_path, config')
+      .eq('namespace', namespace)
+      .eq('name', name);
+
+    if (error || !data || data.length === 0) {
+      fail(`Agent not found: ${fullName}`);
+    }
+    agent = (data as AgentRow[]).sort((a, b) => compareSemver(a.version, b.version)).at(-1)!;
+  }
+
+  // Download from storage
+  const { data: blob, error: downloadError } = await supabase
+    .storage
+    .from('agents')
+    .download(agent.storage_path);
+
+  if (downloadError || !blob) {
+    fail('Download failed', downloadError?.message ?? 'Unknown storage error');
+  }
+
+  const content = await blob.text();
+
+  // Verify content hash
+  const verifySpinner = spinner('Verifying...');
+  const hash = createHash('sha256').update(content).digest('hex');
+  verifySpinner.stop();
+
+  console.log(`${DIM}   content hash: ${hash}${RESET}`);
+
+  if (hash !== agent.content_hash) {
+    console.log(`${RED}   expected: ${agent.content_hash}${RESET}`);
+    fail('Verification failed', `Downloaded file does not match expected hash for ${fullName}`);
+  }
+
+  // Warn about hooks/mcpServers if present
+  const config = agent.config;
+  if (config?.hooks) {
+    console.log(`\n${YELLOW}${BOLD} ⚠ This agent defines hooks:${RESET}`);
+    console.log(`${DIM}${JSON.stringify(config.hooks, null, 2)}${RESET}\n`);
+  }
+  if (config?.mcpServers) {
+    console.log(`\n${YELLOW}${BOLD} ⚠ This agent defines MCP servers:${RESET}`);
+    console.log(`${DIM}${JSON.stringify(config.mcpServers, null, 2)}${RESET}\n`);
+  }
+
+  // Ensure .claude/agents/ directory exists
+  const agentsDir = join(process.cwd(), '.claude', 'agents');
+  mkdirSync(agentsDir, { recursive: true });
+
+  // Write agent file
+  const targetPath = join(agentsDir, `${name}.md`);
+  writeFileSync(targetPath, content);
+
+  console.log(`${BOLD}${GREEN} ✓ Agent verified${RESET}`);
+  console.log(`${DIM}   ${fullName} v${agent.version}${RESET}`);
+  console.log(`${DIM}   → ${targetPath}${RESET}`);
+}
+
+// --- Agent subcommand router ---
+async function handleAgent(agentArgs: string[]): Promise<void> {
+  const agentSub = agentArgs[0];
+
+  if (!agentSub || agentSub === '--help' || agentSub === '-h') {
+    agentUsage(agentSub ? 0 : 1);
+  }
+
+  if (agentSub === 'push') {
+    const pushArgs = agentArgs.slice(1);
+    const isPrivate = pushArgs.includes('--private');
+    const pushPath = pushArgs.find(a => !a.startsWith('--'));
+    await agentPush(pushPath, { private: isPrivate });
+  } else if (agentSub === 'pull' || agentSub === 'install' || agentSub === 'i') {
+    const target = agentArgs[1];
+    if (!target) {
+      fail('Missing agent name', 'Usage: oathbound agent pull <namespace/name[@version]>');
+    }
+    await agentPull(target);
+  } else if (agentSub === 'search' || agentSub === 'list' || agentSub === 'ls') {
+    const searchOpts = parseAgentSearchArgs(agentArgs.slice(1));
+    await agentSearch(searchOpts);
+  } else {
+    agentUsage();
+  }
+}
+
 // --- Entry ---
 if (!import.meta.main) {
   // Module imported for testing — skip CLI entry
@@ -416,6 +543,11 @@ if (subcommand === 'init') {
   search(searchOpts).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Search failed', msg);
+  });
+} else if (subcommand === 'agent') {
+  handleAgent(args.slice(1)).catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    fail('Agent command failed', msg);
   });
 } else {
   const PULL_ALIASES = new Set(['pull', 'i', 'install']);

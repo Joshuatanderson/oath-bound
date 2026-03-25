@@ -14,6 +14,111 @@ export type Database = {
   }
   public: {
     Tables: {
+      agents: {
+        Row: {
+          id: string
+          name: string
+          namespace: string
+          description: string
+          license: string
+          version: string
+          tools: string | null
+          disallowed_tools: string | null
+          model: string | null
+          permission_mode: string | null
+          max_turns: number | null
+          memory_scope: string | null
+          background: boolean
+          effort: string | null
+          isolation: string | null
+          config: Json
+          system_prompt: string
+          storage_path: string
+          content_hash: string
+          compatibility: string | null
+          original_author: string | null
+          visibility: string
+          user_id: string
+          sui_digest: string | null
+          sui_object_id: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          namespace: string
+          description: string
+          license: string
+          version?: string
+          tools?: string | null
+          disallowed_tools?: string | null
+          model?: string | null
+          permission_mode?: string | null
+          max_turns?: number | null
+          memory_scope?: string | null
+          background?: boolean
+          effort?: string | null
+          isolation?: string | null
+          config?: Json
+          system_prompt: string
+          storage_path: string
+          content_hash: string
+          compatibility?: string | null
+          original_author?: string | null
+          visibility?: string
+          user_id: string
+          sui_digest?: string | null
+          sui_object_id?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          namespace?: string
+          description?: string
+          license?: string
+          version?: string
+          tools?: string | null
+          disallowed_tools?: string | null
+          model?: string | null
+          permission_mode?: string | null
+          max_turns?: number | null
+          memory_scope?: string | null
+          background?: boolean
+          effort?: string | null
+          isolation?: string | null
+          config?: Json
+          system_prompt?: string
+          storage_path?: string
+          content_hash?: string
+          compatibility?: string | null
+          original_author?: string | null
+          visibility?: string
+          user_id?: string
+          sui_digest?: string | null
+          sui_object_id?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agents_license_fkey"
+            columns: ["license"]
+            isOneToOne: false
+            referencedRelation: "licenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       licenses: {
         Row: {
           id: string

@@ -18,7 +18,7 @@ export const BRAND = brand();
 
 export function usage(exitCode = 1): never {
   console.log(`
-${BOLD}oathbound${RESET} — install, verify, and publish skills
+${BOLD}oathbound${RESET} — install, verify, and publish skills & agents
 
 ${DIM}Usage:${RESET}
   oathbound init                ${DIM}Setup wizard — configure project${RESET}
@@ -33,9 +33,31 @@ ${DIM}Usage:${RESET}
   oathbound verify              ${DIM}SessionStart hook — verify all skills${RESET}
   oathbound verify --check      ${DIM}PreToolUse hook — check skill integrity${RESET}
 
+${DIM}Agents:${RESET}
+  oathbound agent push [path] [--private]  ${DIM}Publish an agent .md file${RESET}
+  oathbound agent pull <namespace/name[@version]>
+  oathbound agent search [query]           ${DIM}Search agents in the registry${RESET}
+  oathbound agent list                     ${DIM}List all public agents${RESET}
+
 ${DIM}Options:${RESET}
   --help, -h      Show this help message
   --version, -v   Show version
+`);
+  process.exit(exitCode);
+}
+
+export function agentUsage(exitCode = 1): never {
+  console.log(`
+${BOLD}oathbound agent${RESET} — manage Claude Code agents
+
+${DIM}Usage:${RESET}
+  oathbound agent push [path] [--private]  ${DIM}Publish an agent .md file to the registry${RESET}
+  oathbound agent pull <namespace/name[@version]>  ${DIM}Download agent to .claude/agents/${RESET}
+  oathbound agent search [query]           ${DIM}Search agents in the registry${RESET}
+  oathbound agent list                     ${DIM}List all public agents${RESET}
+
+${DIM}Options:${RESET}
+  --help, -h      Show this help message
 `);
   process.exit(exitCode);
 }
