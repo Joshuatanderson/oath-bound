@@ -184,6 +184,23 @@ export async function registerFounder(
   return executeAttestation(tx);
 }
 
+export async function registerAgent(
+  subject: string,
+  agentHash: string
+): Promise<AttestationResult> {
+  const tx = new Transaction();
+  tx.moveCall({
+    target: `${getPackageId()}::registrations::register_agent`,
+    arguments: [
+      tx.object(getAdminCapId()),
+      tx.pure.vector("u8", sha256(subject)),
+      tx.pure.vector("u8", hexToBytes(agentHash)),
+      tx.pure.string(""),
+    ],
+  });
+  return executeAttestation(tx);
+}
+
 export async function registerAuthorship(
   subject: string,
   authorSubject: string

@@ -9,6 +9,7 @@ import {
   agentToMeta,
 } from "@/lib/agent-validator";
 import { isValidSemver, compareSemver, bumpPatch } from "@/lib/semver";
+import { registerAgent, ensureChainWrite } from "@/lib/sui";
 import type { Database, Json } from "@/lib/database.types";
 
 /** Escape ILIKE wildcards in user input. */
@@ -331,26 +332,24 @@ export async function POST(request: Request) {
     );
   }
 
-  // On-chain attestation — optional for now (Stage 5 will add registerAgent to the Move contract)
-  // When registerAgent is deployed, uncomment:
-  //
-  // const subject = `agent:${namespace}/${body.name}@${version}`;
-  // let suiDigest: string | undefined;
-  // let suiObjectId: string | undefined;
-  // try {
-  //   const attestation = await ensureChainWrite(() =>
-  //     registerAgent(subject, agentContentHash)
-  //   );
-  //   suiDigest = attestation.digest;
-  //   suiObjectId = attestation.objectId ?? undefined;
-  // } catch (err) {
-  //   await supabase.storage.from("agents").remove([storagePath]);
-  //   const message = err instanceof Error ? err.message : "Unknown Sui error";
-  //   return NextResponse.json(
-  //     { error: `On-chain attestation failed: ${message}` },
-  //     { status: 500 }
-  //   );
-  // }
+  // On-chain attestation
+  const subject = `agent:${namespace}/${body.name}@${version}`;
+  let suiDigest: string | undefined;
+  let suiObjectId: string | undefined;
+  try {
+    const attestation = await ensureChainWrite(() =>
+      registerAgent(subject, agentContentHash)
+    );
+    suiDigest = attestation.digest;
+    suiObjectId = attestation.objectId ?? undefined;
+  } catch (err) {
+    await supabase.storage.from("agents").remove([storagePath]);
+    const message = err instanceof Error ? err.message : "Unknown Sui error";
+    return NextResponse.json(
+      { error: `On-chain attestation failed: ${message}` },
+      { status: 500 }
+    );
+  }
 
   const license = body.license.toUpperCase();
 
@@ -387,8 +386,8 @@ export async function POST(request: Request) {
     original_author: body.originalAuthor || null,
     user_id: userRecord.id,
     visibility: body.visibility ?? "public",
-    sui_digest: null, // Will be populated in Stage 5
-    sui_object_id: null,
+    sui_digest: suiDigest ?? null,
+    sui_object_id: suiObjectId ?? null,
   });
 
   if (insertError) {
@@ -406,7 +405,7 @@ export async function POST(request: Request) {
     name: body.name,
     version,
     contentHash: agentContentHash,
-    suiDigest: null,
-    suiObjectId: null,
+    suiDigest: suiDigest ?? null,
+    suiObjectId: suiObjectId ?? null,
   });
 }

@@ -60,6 +60,18 @@ module oathbound::registrations {
                vector[], bypass_hash, b"".to_string(), ctx);
     }
 
+    /// Register an agent. Target = content hash of agent .md file.
+    public fun register_agent(
+        admin: &AdminCap,
+        subject: vector<u8>,
+        agent_hash: vector<u8>,
+        uri: String,
+        ctx: &mut TxContext,
+    ) {
+        create(admin, subject, b"register_agent".to_string(),
+               agent_hash, vector[], uri, ctx);
+    }
+
     /// Link a skill to its author. Target = author's subject hash.
     public fun register_authorship(
         admin: &AdminCap,
