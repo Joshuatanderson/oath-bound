@@ -14,6 +14,98 @@ import { ensureChainWrite, registerSkill } from "@/lib/sui";
 import type { SkillFile } from "@/lib/skill-validator";
 import type { Database } from "@/lib/database.types";
 
+/** Escape ILIKE wildcards in user input to prevent wildcard injection. */
+function escapeIlike(str: string): string {
+  return str.replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+export async function GET(request: Request) {
+  const admin = getAdminClient();
+  const { searchParams } = new URL(request.url);
+
+  const q = searchParams.get('q')?.trim() ?? '';
+  const namespace = searchParams.get('namespace')?.trim() ?? '';
+  const sparse = searchParams.get('sparse') === 'true';
+  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') ?? '50', 10) || 50, 1), 100);
+  const offset = Math.max(parseInt(searchParams.get('offset') ?? '0', 10) || 0, 0);
+
+  let query = admin
+    .from('skills')
+    .select(`
+      id, name, description, namespace, version, license, visibility,
+      users (username, display_name, identity_verifications (status)),
+      audits (id, passed)
+    `)
+    .eq('visibility', 'public')
+    .order('created_at', { ascending: false });
+
+  if (namespace) {
+    query = query.eq('namespace', namespace);
+  }
+
+  if (q) {
+    const escaped = escapeIlike(q);
+    query = query.or(`name.ilike.%${escaped}%,description.ilike.%${escaped}%`);
+  }
+
+  const { data: skills, error } = await query;
+
+  if (error) {
+    return NextResponse.json({ error: `Query failed: ${error.message}` }, { status: 500 });
+  }
+
+  // Deduplicate to latest version per namespace/name
+  const seen = new Map<string, (typeof skills)[0]>();
+  for (const skill of skills) {
+    const key = `${skill.namespace}/${skill.name}`;
+    const existing = seen.get(key);
+    if (!existing || compareSemver(skill.version, existing.version) > 0) {
+      seen.set(key, skill);
+    }
+  }
+  const deduped = [...seen.values()];
+  const total = deduped.length;
+
+  // Paginate
+  const page = deduped.slice(offset, offset + limit);
+
+  // Shape response
+  const shaped = page.map((skill) => {
+    if (sparse) {
+      return {
+        name: skill.name,
+        namespace: skill.namespace,
+        description: skill.description,
+        version: skill.version,
+      };
+    }
+
+    const author = Array.isArray(skill.users) ? skill.users[0] : skill.users;
+    const audits = skill.audits ?? [];
+    const hasPassingAudit = audits.some((a) => a.passed);
+    const hasAnyAudit = audits.length > 0;
+
+    return {
+      name: skill.name,
+      namespace: skill.namespace,
+      description: skill.description,
+      version: skill.version,
+      license: skill.license,
+      visibility: skill.visibility,
+      author: author ? {
+        username: author.username,
+        display_name: author.display_name,
+        verified: Array.isArray(author.identity_verifications)
+          ? author.identity_verifications.some((v: { status: string }) => v.status === 'approved')
+          : (author.identity_verifications as { status: string } | null)?.status === 'approved',
+      } : null,
+      audit_status: hasPassingAudit ? 'passed' : hasAnyAudit ? 'failed' : 'none',
+    };
+  });
+
+  return NextResponse.json({ ok: true, skills: shaped, total, limit, offset });
+}
+
 interface SkillSubmission {
   name: string;
   description: string;

@@ -20,13 +20,14 @@ import { isValidSemver, compareSemver } from './semver';
 import { verify, verifyCheck, findSkillsDir } from './verify';
 import { login, logout, whoami } from './auth';
 import { push } from './push';
+import { search, parseSearchArgs } from './search';
 
 // Re-exports for tests
 export { stripJsoncComments, writeOathboundConfig, mergeClaudeSettings, type MergeResult } from './config';
 export { isNewer } from './update';
 export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult, addTrustedDependency, type TrustedDepResult };
 
-const VERSION = '0.11.1';
+const VERSION = '0.12.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -409,6 +410,12 @@ if (subcommand === 'init') {
   push(pushPath, { private: isPrivate }).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Push failed', msg);
+  });
+} else if (subcommand === 'search' || subcommand === 'list' || subcommand === 'ls') {
+  const searchOpts = parseSearchArgs(args.slice(1));
+  search(searchOpts).catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    fail('Search failed', msg);
   });
 } else {
   const PULL_ALIASES = new Set(['pull', 'i', 'install']);
