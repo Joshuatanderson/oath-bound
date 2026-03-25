@@ -49,10 +49,13 @@ describe('parseSearchArgs', () => {
 });
 
 // --- Integration tests: live GET /api/skills ---
+// Skipped in CI — the API may not be deployed yet when tests run.
+// Run locally with: bun test search.test.ts
 
 const API_BASE = process.env.OATHBOUND_API_URL ?? 'https://www.oathbound.ai';
+const isCI = !!process.env.CI;
 
-describe('GET /api/skills (live)', () => {
+describe.skipIf(isCI)('GET /api/skills (live)', () => {
   test('default list returns skills with pagination metadata', async () => {
     const res = await fetch(`${API_BASE}/api/skills`);
     expect(res.ok).toBe(true);
