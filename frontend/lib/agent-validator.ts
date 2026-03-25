@@ -176,7 +176,17 @@ export function validateAgent(content: string): AgentValidateResult {
   }
 
   // Parse frontmatter
-  const { meta, body } = parseAgentFrontmatter(content);
+  let meta: Record<string, unknown>;
+  let body: string;
+  try {
+    ({ meta, body } = parseAgentFrontmatter(content));
+  } catch {
+    checks.push({
+      passed: false,
+      message: "Failed to parse YAML frontmatter — check for syntax errors",
+    });
+    return { checks, parsed: null, canProceed: false };
+  }
 
   if (Object.keys(meta).length === 0) {
     checks.push({

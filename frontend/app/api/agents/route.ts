@@ -14,7 +14,10 @@ import type { Database, Json } from "@/lib/database.types";
 
 /** Escape ILIKE wildcards in user input. */
 function escapeIlike(str: string): string {
-  return str.replace(/%/g, "\\%").replace(/_/g, "\\_");
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
 }
 
 // ---------------------------------------------------------------------------
@@ -47,7 +50,8 @@ export async function GET(request: Request) {
     `
     )
     .eq("visibility", "public")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(1000);
 
   if (namespace) {
     query = query.eq("namespace", namespace);

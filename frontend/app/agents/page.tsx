@@ -31,7 +31,7 @@ export default async function AgentsPage() {
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-10">
         <h1 className="text-4xl font-bold tracking-tight">Agents</h1>
         <p className="text-sm text-destructive">
-          Failed to load agents: {error.message}
+          Failed to load agents. Please try again later.
         </p>
       </main>
     );

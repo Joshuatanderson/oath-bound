@@ -25,7 +25,9 @@ export function SiteHeader() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
     const match = document.cookie.match(/(?:^|; )ob_username=([^;]*)/);
-    if (match) setUsername(decodeURIComponent(match[1]));
+    if (match) {
+      try { setUsername(decodeURIComponent(match[1])); } catch { /* malformed cookie */ }
+    }
   }, []);
 
   return (

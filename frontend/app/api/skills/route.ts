@@ -16,7 +16,10 @@ import type { Database } from "@/lib/database.types";
 
 /** Escape ILIKE wildcards in user input to prevent wildcard injection. */
 function escapeIlike(str: string): string {
-  return str.replace(/%/g, '\\%').replace(/_/g, '\\_');
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_');
 }
 
 export async function GET(request: Request) {

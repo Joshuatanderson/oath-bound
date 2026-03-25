@@ -426,23 +426,44 @@ async function agentPull(agentArg: string): Promise<void> {
     fail('Verification failed', `Downloaded file does not match expected hash for ${fullName}`);
   }
 
-  // Warn about hooks/mcpServers if present
-  const config = agent.config;
-  if (config?.hooks) {
-    console.log(`\n${YELLOW}${BOLD} ⚠ This agent defines hooks:${RESET}`);
-    console.log(`${DIM}${JSON.stringify(config.hooks, null, 2)}${RESET}\n`);
-  }
-  if (config?.mcpServers) {
-    console.log(`\n${YELLOW}${BOLD} ⚠ This agent defines MCP servers:${RESET}`);
-    console.log(`${DIM}${JSON.stringify(config.mcpServers, null, 2)}${RESET}\n`);
+  // Validate name has no path traversal characters
+  if (name.includes('/') || name.includes('\\') || name.includes('..')) {
+    fail('Invalid agent name', `Name "${name}" contains path traversal characters`);
   }
 
   // Ensure .claude/agents/ directory exists
   const agentsDir = join(process.cwd(), '.claude', 'agents');
   mkdirSync(agentsDir, { recursive: true });
 
-  // Write agent file
+  // Validate resolved path stays within agentsDir
   const targetPath = join(agentsDir, `${name}.md`);
+  if (!targetPath.startsWith(agentsDir)) {
+    fail('Invalid agent name', `Resolved path escapes agents directory`);
+  }
+
+  // Warn and confirm if hooks/mcpServers are present
+  const config = agent.config;
+  let hasDangerous = false;
+  if (config?.hooks) {
+    console.log(`\n${YELLOW}${BOLD} ⚠ This agent defines hooks (arbitrary command execution):${RESET}`);
+    console.log(`${DIM}${JSON.stringify(config.hooks, null, 2)}${RESET}\n`);
+    hasDangerous = true;
+  }
+  if (config?.mcpServers) {
+    console.log(`\n${YELLOW}${BOLD} ⚠ This agent defines MCP servers (external connections):${RESET}`);
+    console.log(`${DIM}${JSON.stringify(config.mcpServers, null, 2)}${RESET}\n`);
+    hasDangerous = true;
+  }
+  if (hasDangerous) {
+    const answer = await confirm({
+      message: 'This agent contains security-sensitive configuration. Install anyway?',
+    });
+    if (isCancel(answer) || !answer) {
+      fail('Aborted', 'Agent not installed');
+    }
+  }
+
+  // Write agent file
   writeFileSync(targetPath, content);
 
   console.log(`${BOLD}${GREEN} ✓ Agent verified${RESET}`);
