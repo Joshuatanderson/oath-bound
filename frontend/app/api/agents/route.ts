@@ -318,7 +318,7 @@ export async function POST(request: Request) {
   const shortHash = agentContentHash.slice(0, 6);
   const storagePath = `${namespace}/${body.name}/v${version}-${shortHash}.md`;
 
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await admin.storage
     .from("agents")
     .upload(storagePath, canonicalFile, {
       contentType: "text/markdown",
@@ -343,7 +343,7 @@ export async function POST(request: Request) {
     suiDigest = attestation.digest;
     suiObjectId = attestation.objectId ?? undefined;
   } catch (err) {
-    await supabase.storage.from("agents").remove([storagePath]);
+    await admin.storage.from("agents").remove([storagePath]);
     const message = err instanceof Error ? err.message : "Unknown Sui error";
     return NextResponse.json(
       { error: `On-chain attestation failed: ${message}` },
@@ -392,7 +392,7 @@ export async function POST(request: Request) {
 
   if (insertError) {
     // Clean up uploaded file on failure
-    await supabase.storage.from("agents").remove([storagePath]);
+    await admin.storage.from("agents").remove([storagePath]);
     return NextResponse.json(
       { error: `Failed to save agent: ${insertError.message}` },
       { status: 500 }
