@@ -2,7 +2,7 @@
   "name": "oathbound",
   "version": "0.13.0",
   "description": "Install verified Claude Code skills and agents from the Oath Bound registry",
-  "license": "BUSL-1.1",
+  "license": "MIT",
   "author": "Josh Anderson",
   "homepage": "https://oathbound.ai",
   "repository": {
