@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import {
   mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync,
 } from 'node:fs';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { intro, outro } from '@clack/prompts';
@@ -77,36 +78,39 @@ export async function login(): Promise<void> {
     rejectSession = rej;
   });
 
-  const server = Bun.serve({
-    port: 0,
-    fetch(req) {
-      const url = new URL(req.url);
-      if (url.pathname !== '/callback') {
-        return new Response('Not found', { status: 404 });
-      }
+  const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+    const url = new URL(req.url!, `http://localhost`);
+    if (url.pathname !== '/callback') {
+      res.writeHead(404);
+      res.end('Not found');
+      return;
+    }
 
-      const accessToken = url.searchParams.get('access_token');
-      const refreshToken = url.searchParams.get('refresh_token');
-      const expiresAt = url.searchParams.get('expires_at');
+    const accessToken = url.searchParams.get('access_token');
+    const refreshToken = url.searchParams.get('refresh_token');
+    const expiresAt = url.searchParams.get('expires_at');
 
-      if (!accessToken || !refreshToken || !expiresAt) {
-        rejectSession!(new Error('Missing session tokens from callback'));
-        setTimeout(() => server.stop(), 500);
-        return new Response(ERROR_HTML, { headers: { 'Content-Type': 'text/html' } });
-      }
+    if (!accessToken || !refreshToken || !expiresAt) {
+      rejectSession!(new Error('Missing session tokens from callback'));
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(ERROR_HTML);
+      setTimeout(() => server.close(), 500);
+      return;
+    }
 
-      resolveSession!({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-        expires_at: Number(expiresAt),
-      });
+    resolveSession!({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expires_at: Number(expiresAt),
+    });
 
-      setTimeout(() => server.stop(), 500);
-      return new Response(SUCCESS_HTML, { headers: { 'Content-Type': 'text/html' } });
-    },
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(SUCCESS_HTML);
+    setTimeout(() => server.close(), 500);
   });
 
-  const port = server.port;
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  const port = (server.address() as import('node:net').AddressInfo).port;
   const loginUrl = `${API_BASE}/cli-login?port=${port}`;
 
   console.log(`${DIM}   Opening browser...${RESET}`);
@@ -126,7 +130,7 @@ export async function login(): Promise<void> {
     session = await Promise.race([sessionPromise, timeout]);
   } catch (err) {
     spin.stop();
-    server.stop();
+    server.close();
     fail('Login failed', err instanceof Error ? err.message : 'Unknown error');
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "oathbound",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "Install verified Claude Code skills and agents from the Oath Bound registry",
   "license": "MIT",
   "author": "Josh Anderson",
@@ -18,43 +18,21 @@
     "security",
     "ai-tools"
   ],
-  "type": "module",
   "bin": {
-    "oathbound": "./bin/cli.cjs"
+    "oathbound": "./dist/cli.cjs"
   },
   "files": [
-    "cli.ts",
-    "ui.ts",
-    "config.ts",
-    "update.ts",
-    "verify.ts",
-    "content-hash.ts",
-    "auth.ts",
-    "push.ts",
-    "search.ts",
-    "agent-push.ts",
-    "agent-search.ts",
-    "semver.ts",
-    "bin/cli.cjs",
-    "install.cjs"
+    "dist/cli.cjs"
   ],
   "publishConfig": {
     "access": "public",
     "provenance": true
   },
   "scripts": {
-    "build": "bun build ./cli.ts --compile --outfile dist/oathbound",
-    "build:macos-arm64": "bun build ./cli.ts --compile --target=bun-darwin-arm64 --outfile dist/oathbound-macos-arm64",
-    "build:macos-x64": "bun build ./cli.ts --compile --target=bun-darwin-x64 --outfile dist/oathbound-macos-x64",
-    "build:linux-x64": "bun build ./cli.ts --compile --target=bun-linux-x64 --outfile dist/oathbound-linux-x64",
-    "build:linux-arm64": "bun build ./cli.ts --compile --target=bun-linux-arm64 --outfile dist/oathbound-linux-arm64",
-    "build:windows-x64": "bun build ./cli.ts --compile --target=bun-windows-x64 --outfile dist/oathbound-windows-x64",
-    "build:windows-arm64": "bun build ./cli.ts --compile --target=bun-windows-arm64 --outfile dist/oathbound-windows-arm64",
-    "build:all": "bun run build:macos-arm64 && bun run build:macos-x64 && bun run build:linux-x64 && bun run build:linux-arm64 && bun run build:windows-x64 && bun run build:windows-arm64",
-    "test": "bun test",
-    "postinstall": "node install.cjs"
+    "build": "bun build cli.ts --outfile=dist/cli.cjs --target=node --format=cjs && node -e \"const f='dist/cli.cjs';let s=require('fs').readFileSync(f,'utf8');s=s.replace('require.main == require.module','require.main === module');require('fs').writeFileSync(f,s)\" && printf '%s\\n' '#!/usr/bin/env node' | cat - dist/cli.cjs > dist/tmp && mv dist/tmp dist/cli.cjs",
+    "test": "bun test"
   },
-  "dependencies": {
+  "devDependencies": {
     "@clack/prompts": "^1.1.0",
     "@supabase/supabase-js": "^2",
     "yaml": "^2.8.2"

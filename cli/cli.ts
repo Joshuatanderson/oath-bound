@@ -1,5 +1,3 @@
-#!/usr/bin/env bun
-
 import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -27,9 +25,9 @@ import { agentSearch, parseAgentSearchArgs } from './agent-search';
 // Re-exports for tests
 export { stripJsoncComments, writeOathboundConfig, mergeClaudeSettings, type MergeResult } from './config';
 export { isNewer } from './update';
-export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult, addTrustedDependency, type TrustedDepResult };
+export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult };
 
-const VERSION = '0.14.0';
+const VERSION = '0.15.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -109,27 +107,6 @@ function setup(): void {
     process.stderr.write('oathbound setup: .claude/settings.json is malformed — hooks not installed\n');
     process.exit(1);
   }
-}
-
-type TrustedDepResult = 'added' | 'skipped';
-
-function addTrustedDependency(): TrustedDepResult {
-  const pkgPath = join(process.cwd(), 'package.json');
-  if (!existsSync(pkgPath)) return 'skipped';
-
-  let pkg: Record<string, unknown>;
-  try {
-    pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-  } catch {
-    return 'skipped';
-  }
-
-  const trusted = Array.isArray(pkg.trustedDependencies) ? pkg.trustedDependencies as string[] : [];
-  if (trusted.includes('oathbound')) return 'skipped';
-
-  pkg.trustedDependencies = [...trusted, 'oathbound'];
-  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-  return 'added';
 }
 
 type PrepareResult = 'added' | 'appended' | 'skipped';
@@ -218,15 +195,6 @@ async function init(): Promise<void> {
     case 'no-package-json':
       process.stderr.write(`${RED} ✗ package.json was created but could not be found — something went wrong${RESET}\n`);
       process.exit(1);
-  }
-
-  // For bun/pnpm: add trustedDependencies so postinstall runs
-  const pm = detectPackageManager();
-  if (pm === 'bun' || pm === 'pnpm') {
-    const trustResult = addTrustedDependency();
-    if (trustResult === 'added') {
-      process.stderr.write(`${GREEN} ✓ Added oathbound to trustedDependencies (required by ${pm})${RESET}\n`);
-    }
   }
 
   // Add prepare script to package.json
@@ -530,10 +498,12 @@ async function handleAgent(agentArgs: string[]): Promise<void> {
 }
 
 // --- Entry ---
-if (!import.meta.main) {
-  // Module imported for testing — skip CLI entry
-} else {
-const args = Bun.argv.slice(2);
+// import.meta.main guards against running when imported for testing.
+// bun build --format=cjs converts this to a CJS-compatible check.
+// Wrapped in async IIFE because top-level await is not available in CJS.
+if (import.meta.main) {
+(async () => {
+const args = process.argv.slice(2);
 const subcommand = args[0];
 
 if (subcommand === '--help' || subcommand === '-h') {
@@ -553,7 +523,7 @@ if (subcommand !== 'verify' && subcommand !== 'setup') {
 }
 
 if (subcommand === 'init') {
-  init().catch((err: unknown) => {
+  await init().catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Init failed', msg);
   });
@@ -562,23 +532,23 @@ if (subcommand === 'init') {
 } else if (subcommand === 'verify') {
   const isCheck = args.includes('--check');
   const run = isCheck ? verifyCheck : () => verify(SUPABASE_URL, SUPABASE_ANON_KEY);
-  run().catch((err: unknown) => {
+  await run().catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     process.stderr.write(`oathbound verify: ${msg}\n`);
     process.exit(1);
   });
 } else if (subcommand === 'login') {
-  login().catch((err: unknown) => {
+  await login().catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Login failed', msg);
   });
 } else if (subcommand === 'logout') {
-  logout().catch((err: unknown) => {
+  await logout().catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Logout failed', msg);
   });
 } else if (subcommand === 'whoami') {
-  whoami().catch((err: unknown) => {
+  await whoami().catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Failed', msg);
   });
@@ -586,18 +556,18 @@ if (subcommand === 'init') {
   const pushArgs = args.slice(1);
   const isPrivate = pushArgs.includes('--private');
   const pushPath = pushArgs.find(a => !a.startsWith('--'));
-  push(pushPath, { private: isPrivate }).catch((err: unknown) => {
+  await push(pushPath, { private: isPrivate }).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Push failed', msg);
   });
 } else if (subcommand === 'search' || subcommand === 'list' || subcommand === 'ls') {
   const searchOpts = parseSearchArgs(args.slice(1));
-  search(searchOpts).catch((err: unknown) => {
+  await search(searchOpts).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Search failed', msg);
   });
 } else if (subcommand === 'agent') {
-  handleAgent(args.slice(1)).catch((err: unknown) => {
+  await handleAgent(args.slice(1)).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Agent command failed', msg);
   });
@@ -609,9 +579,10 @@ if (subcommand === 'init') {
     usage();
   }
 
-  pull(skillArg).catch((err: unknown) => {
+  await pull(skillArg).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Unexpected error', msg);
   });
 }
+})();
 } // end if (import.meta.main)
