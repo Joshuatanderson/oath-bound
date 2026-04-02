@@ -137,6 +137,7 @@ export async function GET(request: Request) {
 
     if (sparse) {
       return {
+        id: agent.id,
         name: agent.name,
         namespace: agent.namespace,
         description: agent.description,
@@ -150,6 +151,7 @@ export async function GET(request: Request) {
       : agent.users;
 
     return {
+      id: agent.id,
       name: agent.name,
       namespace: agent.namespace,
       description: agent.description,

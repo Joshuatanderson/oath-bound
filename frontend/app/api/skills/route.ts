@@ -115,6 +115,7 @@ export async function GET(request: Request) {
 
     if (sparse) {
       return {
+        id: skill.id,
         name: skill.name,
         namespace: skill.namespace,
         description: skill.description,
@@ -129,6 +130,7 @@ export async function GET(request: Request) {
     const hasAnyAudit = audits.length > 0;
 
     return {
+      id: skill.id,
       name: skill.name,
       namespace: skill.namespace,
       description: skill.description,
