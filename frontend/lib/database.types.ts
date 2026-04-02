@@ -137,6 +137,45 @@ export type Database = {
         }
         Relationships: []
       }
+      downloads: {
+        Row: {
+          id: string
+          skill_id: string | null
+          agent_id: string | null
+          version: string
+          downloaded_at: string
+        }
+        Insert: {
+          id?: string
+          skill_id?: string | null
+          agent_id?: string | null
+          version: string
+          downloaded_at?: string
+        }
+        Update: {
+          id?: string
+          skill_id?: string | null
+          agent_id?: string | null
+          version?: string
+          downloaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "downloads_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "downloads_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audits: {
         Row: {
           audited_at: string

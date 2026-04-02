@@ -6,6 +6,7 @@ export interface SearchOptions {
   query?: string;
   namespace?: string;
   sparse?: boolean;
+  sort?: 'downloads';
   limit?: number;
   offset?: number;
 }
@@ -21,6 +22,9 @@ export function parseSearchArgs(args: string[]): SearchOptions {
       opts.namespace = args[++i];
     } else if (arg === '--sparse' || arg === '-s') {
       opts.sparse = true;
+    } else if (arg === '--sort') {
+      const val = args[++i];
+      if (val === 'downloads') opts.sort = 'downloads';
     } else if (arg === '--limit') {
       opts.limit = parseInt(args[++i], 10);
     } else if (arg === '--offset') {
@@ -50,6 +54,7 @@ interface SkillResult {
   visibility?: string;
   author?: SkillAuthor;
   audit_status?: 'passed' | 'failed' | 'none';
+  download_count?: number;
 }
 
 interface SearchResponse {
@@ -66,6 +71,7 @@ export async function search(opts: SearchOptions): Promise<void> {
   if (opts.query) params.set('q', opts.query);
   if (opts.namespace) params.set('namespace', opts.namespace);
   if (opts.sparse) params.set('sparse', 'true');
+  if (opts.sort) params.set('sort', opts.sort);
   if (opts.limit != null) params.set('limit', String(opts.limit));
   if (opts.offset != null) params.set('offset', String(opts.offset));
 
@@ -132,6 +138,7 @@ export async function search(opts: SearchOptions): Promise<void> {
         parts.push(`by ${name}${skill.author.verified ? ' ✓' : ''}`);
       }
       if (skill.license) parts.push(skill.license);
+      if (skill.download_count != null) parts.push(`↓ ${skill.download_count}`);
       if (skill.audit_status && skill.audit_status !== 'none') {
         parts.push(skill.audit_status === 'passed' ? `${GREEN}audited${RESET}` : 'audit failed');
       }

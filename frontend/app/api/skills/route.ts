@@ -29,6 +29,7 @@ export async function GET(request: Request) {
   const q = searchParams.get('q')?.trim() ?? '';
   const namespace = searchParams.get('namespace')?.trim() ?? '';
   const sparse = searchParams.get('sparse') === 'true';
+  const sort = searchParams.get('sort') === 'downloads' ? 'downloads' : 'recent';
   const limit = Math.min(Math.max(parseInt(searchParams.get('limit') ?? '50', 10) || 50, 1), 100);
   const offset = Math.max(parseInt(searchParams.get('offset') ?? '0', 10) || 0, 0);
 
@@ -57,16 +58,52 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: `Query failed: ${error.message}` }, { status: 500 });
   }
 
-  // Deduplicate to latest version per namespace/name
+  // Collect all version IDs per namespace/name, then deduplicate to latest
+  const allIdsByKey = new Map<string, string[]>();
   const seen = new Map<string, (typeof skills)[0]>();
   for (const skill of skills) {
     const key = `${skill.namespace}/${skill.name}`;
+    const ids = allIdsByKey.get(key) ?? [];
+    ids.push(skill.id);
+    allIdsByKey.set(key, ids);
     const existing = seen.get(key);
     if (!existing || compareSemver(skill.version, existing.version) > 0) {
       seen.set(key, skill);
     }
   }
   const deduped = [...seen.values()];
+
+  // Get download counts across ALL version IDs, mapped to deduplicated key
+  const allSkillIds = skills.map((s) => s.id);
+  const downloadCountMap = new Map<string, number>();
+  if (allSkillIds.length > 0) {
+    const { data: downloads } = await admin
+      .from('downloads')
+      .select('skill_id')
+      .in('skill_id', allSkillIds);
+
+    // Map each version row's downloads to the deduplicated skill's latest ID
+    const versionIdToLatestId = new Map<string, string>();
+    for (const [key, ids] of allIdsByKey) {
+      const latest = seen.get(key)!;
+      for (const id of ids) {
+        versionIdToLatestId.set(id, latest.id);
+      }
+    }
+
+    for (const d of downloads ?? []) {
+      if (d.skill_id) {
+        const latestId = versionIdToLatestId.get(d.skill_id) ?? d.skill_id;
+        downloadCountMap.set(latestId, (downloadCountMap.get(latestId) ?? 0) + 1);
+      }
+    }
+  }
+
+  // Sort
+  if (sort === 'downloads') {
+    deduped.sort((a, b) => (downloadCountMap.get(b.id) ?? 0) - (downloadCountMap.get(a.id) ?? 0));
+  }
+
   const total = deduped.length;
 
   // Paginate
@@ -74,12 +111,15 @@ export async function GET(request: Request) {
 
   // Shape response
   const shaped = page.map((skill) => {
+    const download_count = downloadCountMap.get(skill.id) ?? 0;
+
     if (sparse) {
       return {
         name: skill.name,
         namespace: skill.namespace,
         description: skill.description,
         version: skill.version,
+        download_count,
       };
     }
 
@@ -103,6 +143,7 @@ export async function GET(request: Request) {
           : (author.identity_verifications as { status: string } | null)?.status === 'approved',
       } : null,
       audit_status: hasPassingAudit ? 'passed' : hasAnyAudit ? 'failed' : 'none',
+      download_count,
     };
   });
 

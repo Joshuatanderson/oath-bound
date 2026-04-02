@@ -9,7 +9,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, FileCheck, User, Lock } from "lucide-react";
+import { ShieldCheck, FileCheck, User, Lock, Download } from "lucide-react";
 
 export default async function SkillsPage() {
   const supabase = await getServerClient();
@@ -23,6 +23,7 @@ export default async function SkillsPage() {
       audits (id, passed)
     `
     )
+    .eq("visibility", "public")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -36,16 +37,50 @@ export default async function SkillsPage() {
     );
   }
 
-  // Deduplicate to latest version per skill
+  // Collect all version IDs per namespace/name, then deduplicate to latest
+  const allIdsByKey = new Map<string, string[]>();
   const seen = new Map<string, (typeof skills)[0]>();
   for (const skill of skills) {
     const key = `${skill.namespace}/${skill.name}`;
+    const ids = allIdsByKey.get(key) ?? [];
+    ids.push(skill.id);
+    allIdsByKey.set(key, ids);
     const existing = seen.get(key);
     if (!existing || compareSemver(skill.version, existing.version) > 0) {
       seen.set(key, skill);
     }
   }
-  const latestSkills = [...seen.values()];
+  const deduped = [...seen.values()];
+
+  // Get download counts across ALL version IDs, mapped to deduplicated key
+  const allSkillIds = skills.map((s) => s.id);
+  const downloadCountMap = new Map<string, number>();
+  if (allSkillIds.length > 0) {
+    const { data: downloads } = await supabase
+      .from("downloads")
+      .select("skill_id")
+      .in("skill_id", allSkillIds);
+
+    const versionIdToLatestId = new Map<string, string>();
+    for (const [key, ids] of allIdsByKey) {
+      const latest = seen.get(key)!;
+      for (const id of ids) {
+        versionIdToLatestId.set(id, latest.id);
+      }
+    }
+
+    for (const d of downloads ?? []) {
+      if (d.skill_id) {
+        const latestId = versionIdToLatestId.get(d.skill_id) ?? d.skill_id;
+        downloadCountMap.set(latestId, (downloadCountMap.get(latestId) ?? 0) + 1);
+      }
+    }
+  }
+
+  // Sort by download count descending
+  const latestSkills = deduped.sort(
+    (a, b) => (downloadCountMap.get(b.id) ?? 0) - (downloadCountMap.get(a.id) ?? 0)
+  );
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-10">
@@ -65,6 +100,7 @@ export default async function SkillsPage() {
             const audits = skill.audits ?? [];
             const hasPassingAudit = audits.some((a) => a.passed);
             const hasAnyAudit = audits.length > 0;
+            const downloads = downloadCountMap.get(skill.id) ?? 0;
 
             return (
               <Link key={skill.id} href={`/skills/${skill.id}`}>
@@ -86,6 +122,11 @@ export default async function SkillsPage() {
                           <span className="font-medium text-foreground">
                             {authorName}
                           </span>
+                        </span>
+
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Download className="size-3" />
+                          {downloads}
                         </span>
 
                         {skill.original_author && (

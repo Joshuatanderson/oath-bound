@@ -31,6 +31,7 @@ export async function GET(request: Request) {
   const q = searchParams.get("q")?.trim() ?? "";
   const namespace = searchParams.get("namespace")?.trim() ?? "";
   const sparse = searchParams.get("sparse") === "true";
+  const sort = searchParams.get("sort") === "downloads" ? "downloads" : "recent";
   const limit = Math.min(
     Math.max(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 1),
     100
@@ -73,16 +74,58 @@ export async function GET(request: Request) {
     );
   }
 
-  // Deduplicate to latest version per namespace/name
+  // Collect all version IDs per namespace/name, then deduplicate to latest
+  const allIdsByKey = new Map<string, string[]>();
   const seen = new Map<string, (typeof agents)[0]>();
   for (const agent of agents) {
     const key = `${agent.namespace}/${agent.name}`;
+    const ids = allIdsByKey.get(key) ?? [];
+    ids.push(agent.id);
+    allIdsByKey.set(key, ids);
     const existing = seen.get(key);
     if (!existing || compareSemver(agent.version, existing.version) > 0) {
       seen.set(key, agent);
     }
   }
   const deduped = [...seen.values()];
+
+  // Get download counts across ALL version IDs, mapped to deduplicated key
+  const allAgentIds = agents.map((a) => a.id);
+  const downloadCountMap = new Map<string, number>();
+  if (allAgentIds.length > 0) {
+    const { data: downloads } = await admin
+      .from("downloads")
+      .select("agent_id")
+      .in("agent_id", allAgentIds);
+
+    // Map each version row's downloads to the deduplicated agent's latest ID
+    const versionIdToLatestId = new Map<string, string>();
+    for (const [key, ids] of allIdsByKey) {
+      const latest = seen.get(key)!;
+      for (const id of ids) {
+        versionIdToLatestId.set(id, latest.id);
+      }
+    }
+
+    for (const d of downloads ?? []) {
+      if (d.agent_id) {
+        const latestId = versionIdToLatestId.get(d.agent_id) ?? d.agent_id;
+        downloadCountMap.set(
+          latestId,
+          (downloadCountMap.get(latestId) ?? 0) + 1
+        );
+      }
+    }
+  }
+
+  // Sort
+  if (sort === "downloads") {
+    deduped.sort(
+      (a, b) =>
+        (downloadCountMap.get(b.id) ?? 0) - (downloadCountMap.get(a.id) ?? 0)
+    );
+  }
+
   const total = deduped.length;
 
   // Paginate
@@ -90,12 +133,15 @@ export async function GET(request: Request) {
 
   // Shape response
   const shaped = page.map((agent) => {
+    const download_count = downloadCountMap.get(agent.id) ?? 0;
+
     if (sparse) {
       return {
         name: agent.name,
         namespace: agent.namespace,
         description: agent.description,
         version: agent.version,
+        download_count,
       };
     }
 
@@ -114,6 +160,7 @@ export async function GET(request: Request) {
       tools: agent.tools,
       permission_mode: agent.permission_mode,
       effort: agent.effort,
+      download_count,
       author: author
         ? {
             username: author.username,

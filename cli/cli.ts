@@ -29,14 +29,16 @@ export { stripJsoncComments, writeOathboundConfig, mergeClaudeSettings, type Mer
 export { isNewer } from './update';
 export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult, addTrustedDependency, type TrustedDepResult };
 
-const VERSION = '0.13.1';
+const VERSION = '0.14.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_T-rk0azNRqAMLLGCyadyhQ_ulk9685n';
+const API_BASE = process.env.OATHBOUND_API_URL ?? 'https://www.oathbound.ai';
 
 // --- Types ---
 interface SkillRow {
+  id: string;
   name: string;
   namespace: string;
   version: string;
@@ -279,7 +281,7 @@ async function pull(skillArg: string): Promise<void> {
   if (version !== null) {
     const { data, error } = await supabase
       .from('skills')
-      .select('name, namespace, version, tar_hash, storage_path')
+      .select('id, name, namespace, version, tar_hash, storage_path')
       .eq('namespace', namespace)
       .eq('name', name)
       .eq('version', version)
@@ -293,7 +295,7 @@ async function pull(skillArg: string): Promise<void> {
     // Fetch all versions, pick highest via semver comparison
     const { data, error } = await supabase
       .from('skills')
-      .select('name, namespace, version, tar_hash, storage_path')
+      .select('id, name, namespace, version, tar_hash, storage_path')
       .eq('namespace', namespace)
       .eq('name', name);
 
@@ -346,7 +348,21 @@ async function pull(skillArg: string): Promise<void> {
   }
   unlinkSync(tarFile);
 
-  // 5. Success
+  // 5. Record download (non-fatal)
+  try {
+    const trackRes = await fetch(`${API_BASE}/api/downloads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ skill_id: skill.id, version: skill.version }),
+    });
+    if (!trackRes.ok) {
+      process.stderr.write(`${DIM}   [warn] download tracking failed (${trackRes.status})${RESET}\n`);
+    }
+  } catch {
+    // Network error — non-fatal
+  }
+
+  // 6. Success
   console.log(`${BOLD}${GREEN} ✓ Skill verified${RESET}`);
   console.log(`${DIM}   ${fullName} v${skill.version}${RESET}`);
   console.log(`${DIM}   → ${join(skillsDir, name)}${RESET}`);
@@ -354,6 +370,7 @@ async function pull(skillArg: string): Promise<void> {
 
 // --- Agent types ---
 interface AgentRow {
+  id: string;
   name: string;
   namespace: string;
   version: string;
@@ -379,7 +396,7 @@ async function agentPull(agentArg: string): Promise<void> {
   if (version !== null) {
     const { data, error } = await supabase
       .from('agents')
-      .select('name, namespace, version, content_hash, storage_path, config')
+      .select('id, name, namespace, version, content_hash, storage_path, config')
       .eq('namespace', namespace)
       .eq('name', name)
       .eq('version', version)
@@ -392,7 +409,7 @@ async function agentPull(agentArg: string): Promise<void> {
   } else {
     const { data, error } = await supabase
       .from('agents')
-      .select('name, namespace, version, content_hash, storage_path, config')
+      .select('id, name, namespace, version, content_hash, storage_path, config')
       .eq('namespace', namespace)
       .eq('name', name);
 
@@ -465,6 +482,20 @@ async function agentPull(agentArg: string): Promise<void> {
 
   // Write agent file
   writeFileSync(targetPath, content);
+
+  // Record download (non-fatal)
+  try {
+    const trackRes = await fetch(`${API_BASE}/api/downloads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: agent.id, version: agent.version }),
+    });
+    if (!trackRes.ok) {
+      process.stderr.write(`${DIM}   [warn] download tracking failed (${trackRes.status})${RESET}\n`);
+    }
+  } catch {
+    // Network error — non-fatal
+  }
 
   console.log(`${BOLD}${GREEN} ✓ Agent verified${RESET}`);
   console.log(`${DIM}   ${fullName} v${agent.version}${RESET}`);
