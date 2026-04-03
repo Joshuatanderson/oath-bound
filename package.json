@@ -1,11 +1,13 @@
 {
   "name": "oath-bound",
   "private": true,
-  "trustedDependencies": ["oathbound"],
+  "trustedDependencies": [
+    "oathbound"
+  ],
   "scripts": {
     "prepare": "oathbound setup"
   },
   "devDependencies": {
-    "oathbound": "^0.8.0"
+    "oathbound": "^0.17.0"
   }
 }

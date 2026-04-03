@@ -1,11 +1,6 @@
-(in no particular order)
 
-- version numbers on skills
-  - Support multiple versions. 
-  - Tie together skills of multiple versions. 
-  - Hide old versions by default.
-
-- cli - publish to npm
-- persona
-- fetch skill
-- push skill
+## Distribution
+- [ ] skill install --> brings setup with it
+- [x] global setup - handle adding scenarios and merge as well as init. Will need to also handle skill pulls
+- [x] change options - warn as default, others as changeable config
+- [ ]
