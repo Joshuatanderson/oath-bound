@@ -67,7 +67,6 @@ export default function SubmitPage() {
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => {
             setVerified(d?.verified ?? false);
-            if (d?.bypassAvailable) setBypassAvailable(true);
           })
           .catch(() => setVerified(false))
           .finally(() => setAuthLoading(false));
@@ -241,7 +240,6 @@ export default function SubmitPage() {
   const [suiObjectId, setSuiObjectId] = useState<string | null>(null);
 
   // Founder bypass
-  const [bypassAvailable, setBypassAvailable] = useState(false);
   const [bypassPassword, setBypassPassword] = useState("");
   const [bypassLoading, setBypassLoading] = useState(false);
   const [bypassError, setBypassError] = useState<string | null>(null);
@@ -328,8 +326,7 @@ export default function SubmitPage() {
             Automated verification is temporarily unavailable. Contact us directly for onboarding.
           </p>
 
-          {bypassAvailable && (
-            <div className="flex flex-col gap-3 border-t pt-6">
+          <div className="flex flex-col gap-3 border-t pt-6">
               <h2 className="text-sm font-medium">Founder access</h2>
               <p className="text-sm text-muted-foreground">
                 If you were given a founder password, enter it here to skip ID
@@ -390,7 +387,21 @@ export default function SubmitPage() {
                 </Button>
               </div>
             </div>
-          )}
+        </div>
+      )}
+
+      {/* Not signed in */}
+      {!authLoading && !user && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Sign in to submit skills
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            You need to be signed in to publish skills on Oath Bound.
+          </p>
+          <Button asChild size="lg" className="w-fit">
+            <a href="/login">Sign in</a>
+          </Button>
         </div>
       )}
 
