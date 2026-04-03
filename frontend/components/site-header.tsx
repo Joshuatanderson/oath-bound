@@ -58,6 +58,12 @@ export function SiteHeader() {
             >
               Agents
             </Link>
+            <Link
+              href="/docs"
+              className="text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Docs
+            </Link>
           </nav>
         </div>
 
