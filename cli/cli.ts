@@ -6,7 +6,7 @@ import {
 } from 'node:fs';
 import { join, basename } from 'node:path';
 import { tmpdir } from 'node:os';
-import { intro, outro, select, confirm, cancel, isCancel } from '@clack/prompts';
+import { intro, outro, confirm, cancel, isCancel } from '@clack/prompts';
 
 import { BRAND, TEAL, GREEN, RED, YELLOW, DIM, BOLD, RESET, usage, agentUsage, fail, spinner } from './ui';
 import {
@@ -27,7 +27,7 @@ export { stripJsoncComments, writeOathboundConfig, mergeClaudeSettings, type Mer
 export { isNewer } from './update';
 export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult };
 
-const VERSION = '0.15.0';
+const VERSION = '0.15.1';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -135,21 +135,7 @@ function addPrepareScript(): PrepareResult {
 async function init(): Promise<void> {
   intro(BRAND);
 
-  const enforcement = await select({
-    message: 'Choose an enforcement level:',
-    options: [
-      { value: 'warn', label: 'Warn', hint: 'Report unverified skills but allow them' },
-      { value: 'registered', label: 'Registered', hint: 'Block unregistered skills' },
-      { value: 'audited', label: 'Audited', hint: 'Block skills without a passed audit' },
-    ],
-  });
-
-  if (isCancel(enforcement)) {
-    cancel('Setup cancelled.');
-    process.exit(0);
-  }
-
-  const level = enforcement as EnforcementLevel;
+  const level: EnforcementLevel = 'warn';
 
   // Install as devDependency
   let installResult = installDevDependency();
