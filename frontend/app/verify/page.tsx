@@ -241,9 +241,12 @@ function VerifyContent() {
 
       {state === "ready" && (
         <>
-          <Button size="lg" onClick={startVerification}>
+          <Button size="lg" disabled className="opacity-50 cursor-not-allowed">
             Start verification
           </Button>
+          <p className="text-xs text-muted-foreground -mt-2">
+            Automated verification is temporarily unavailable. Contact us directly for onboarding.
+          </p>
 
           {bypassAvailable && (
             <div className="flex flex-col gap-3 border-t pt-6">

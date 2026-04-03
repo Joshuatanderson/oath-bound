@@ -318,12 +318,15 @@ export default function SubmitPage() {
           </p>
           <Button
             size="lg"
-            className="w-fit"
-            onClick={() => window.location.assign("/verify?returnTo=/submit")}
+            className="w-fit opacity-50 cursor-not-allowed"
+            disabled
           >
             <ShieldCheck className="mr-2 h-4 w-4" />
             Verify identity
           </Button>
+          <p className="text-xs text-muted-foreground">
+            Automated verification is temporarily unavailable. Contact us directly for onboarding.
+          </p>
 
           {bypassAvailable && (
             <div className="flex flex-col gap-3 border-t pt-6">
@@ -671,7 +674,8 @@ export default function SubmitPage() {
               <Button
                 type="button"
                 size="lg"
-                onClick={() => window.location.assign("/verify?returnTo=/submit")}
+                disabled
+                className="opacity-50 cursor-not-allowed"
               >
                 <ShieldCheck className="mr-2 h-4 w-4" />
                 Verify identity to submit
