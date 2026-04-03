@@ -4,18 +4,20 @@ import {
   readdirSync, statSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { parse as yamlParse } from 'yaml';
 import { BRAND, TEAL, GREEN, RED, YELLOW, DIM, BOLD, RESET } from './ui';
 import { hashSkillDir } from './content-hash';
-import { readOathboundConfig, type EnforcementLevel } from './config';
+import { readOathboundConfig, writeOathboundConfig, mergeClaudeSettings, type EnforcementLevel } from './config';
 import { isValidSemver } from './semver';
+import { addPrepareScript } from './project-setup';
 
 // --- Session state file ---
 interface SessionState {
   verified: Record<string, string>; // skill name → content_hash
   rejected: { name: string; reason: string }[];
   ok: boolean;
+  skillDirs?: Record<string, string>; // skill name → full dir path
 }
 
 function sessionStatePath(sessionId: string): string {
@@ -30,7 +32,15 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf-8');
 }
 
-export function findSkillsDir(): string {
+// --- Skills directory resolution ---
+
+export interface SkillsDirEntry {
+  path: string;
+  source: 'global' | 'local';
+}
+
+/** Resolve local .claude/skills directory without falling back to cwd. */
+function resolveLocalSkillsDir(): string | null {
   const cwd = process.cwd();
   const normalized = cwd.replace(/\/+$/, '');
 
@@ -71,7 +81,78 @@ export function findSkillsDir(): string {
     return null;
   }
 
-  return search(cwd, 5) ?? cwd;
+  return search(cwd, 5);
+}
+
+function hasSkillSubdirs(dir: string): boolean {
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    return entries.some(e => e.isDirectory() && !e.name.startsWith('.'));
+  } catch {
+    return false;
+  }
+}
+
+/** Find all skills directories (global + local). */
+export function findSkillsDirs(): SkillsDirEntry[] {
+  const results: SkillsDirEntry[] = [];
+
+  // 1. Global: ~/.claude/skills/
+  const globalDir = join(homedir(), '.claude', 'skills');
+  if (existsSync(globalDir) && hasSkillSubdirs(globalDir)) {
+    results.push({ path: globalDir, source: 'global' });
+  }
+
+  // 2. Local: existing resolution (without cwd fallback)
+  const localDir = resolveLocalSkillsDir();
+  if (localDir && hasSkillSubdirs(localDir)) {
+    results.push({ path: localDir, source: 'local' });
+  }
+
+  return results;
+}
+
+/** Auto-configure a project that has skills but no oathbound config. Fire-and-forget. */
+function propagateToProject(): void {
+  try {
+    const cwd = process.cwd();
+    const localSkills = join(cwd, '.claude', 'skills');
+    if (!existsSync(localSkills)) return;
+    if (!hasSkillSubdirs(localSkills)) return;
+    if (existsSync(join(cwd, '.oathbound.jsonc'))) return;
+    const pkgPath = join(cwd, 'package.json');
+    if (!existsSync(pkgPath)) return;
+
+    // 1. Create .oathbound.jsonc
+    writeOathboundConfig('warn');
+
+    // 2. Add devDep to package.json (no install)
+    const raw = readFileSync(pkgPath, 'utf-8');
+    const pkg = JSON.parse(raw);
+    if (!pkg.devDependencies?.oathbound && !pkg.dependencies?.oathbound) {
+      pkg.devDependencies = { ...(pkg.devDependencies ?? {}), oathbound: 'latest' };
+      const indent = raw.match(/^(\s+)/m)?.[1]?.length ?? 2;
+      writeFileSync(pkgPath, JSON.stringify(pkg, null, indent) + '\n');
+    }
+
+    // 3. Add prepare script
+    addPrepareScript();
+
+    // 4. Merge Claude hooks
+    mergeClaudeSettings();
+
+    // 5. Log
+    process.stderr.write(`\nOathbound: configured project for team verification.\n`);
+    process.stderr.write(`  Created .oathbound.jsonc\n`);
+    process.stderr.write(`  Added oathbound to devDependencies\n`);
+    process.stderr.write(`  Added prepare script to package.json\n\n`);
+    process.stderr.write(`  Commit these changes to protect your team:\n`);
+    process.stderr.write(`    git add .oathbound.jsonc package.json .claude/settings.json\n\n`);
+    process.stderr.write(`  Then run: npm install (or bun/pnpm install)\n\n`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    process.stderr.write(`oathbound: auto-propagation warning: ${msg}\n`);
+  }
 }
 
 /** Extract skill name from a file path if it references .claude/skills/<name>/... */
@@ -116,24 +197,27 @@ function warnSkill(skillName: string, reason: string): never {
 function isExternalSkillAccess(
   toolName: string,
   toolInput: Record<string, unknown>,
-  skillsDir: string,
+  knownDirs: string[],
   baseName: string,
 ): boolean {
-  const resolvedSkillsDir = resolve(skillsDir);
+  const resolvedDirs = knownDirs.map(d => resolve(d));
+
+  const isUnderKnownDir = (p: string): boolean => {
+    const rp = resolve(p);
+    return resolvedDirs.some(d => rp.startsWith(d));
+  };
 
   if (toolName === 'Read') {
     const p = String(toolInput.file_path ?? '');
-    if (p && !resolve(p).startsWith(resolvedSkillsDir)) return true;
+    if (p && !isUnderKnownDir(p)) return true;
   }
   if (toolName === 'Glob' || toolName === 'Grep') {
     const p = String(toolInput.path ?? '');
-    if (p && !resolve(p).startsWith(resolvedSkillsDir)) return true;
+    if (p && !isUnderKnownDir(p)) return true;
   }
   if (toolName === 'Bash') {
     const cmd = String(toolInput.command ?? '');
-    // If the command contains an absolute path to .claude/skills/baseName
-    // that ISN'T under our project's skills dir, it's external
-    if (cmd.includes('/.claude/skills/' + baseName) && !cmd.includes(resolvedSkillsDir)) return true;
+    if (cmd.includes('/.claude/skills/' + baseName) && !resolvedDirs.some(d => cmd.includes(d))) return true;
   }
 
   return false;
@@ -171,35 +255,37 @@ export async function verify(supabaseUrl: string, supabaseAnonKey: string): Prom
     process.exit(1);
   }
 
-  const skillsDir = findSkillsDir();
+  const skillsDirs = findSkillsDirs();
 
-  // Guard: findSkillsDir() falls back to cwd if no .claude/skills found.
-  // In verify mode, we must NOT hash the entire project — only .claude/skills.
-  if (!skillsDir.endsWith('.claude/skills') && !skillsDir.includes('.claude/skills')) {
+  // Auto-propagate config to project if conditions met
+  propagateToProject();
+
+  if (skillsDirs.length === 0) {
     const state: SessionState = { verified: {}, rejected: [], ok: true };
     writeFileSync(sessionStatePath(sessionId), JSON.stringify(state));
-    console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: 'Oathbound: no .claude/skills/ directory found — nothing to verify.' } }));
+    console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: 'Oathbound: no skills found — nothing to verify.' } }));
     process.exit(0);
   }
 
-  // List skill subdirectories
-  const entries = readdirSync(skillsDir, { withFileTypes: true });
-  const skillDirs = entries.filter((e) => e.isDirectory() && !e.name.startsWith('.'));
+  // Collect skills from all dirs: global first, local overwrites on name collision
+  const localSkills: Record<string, { hash: string; version: string; dir: string }> = {};
+  for (const { path: dir } of skillsDirs) {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const e of entries.filter(e => e.isDirectory() && !e.name.startsWith('.'))) {
+      const fullPath = join(dir, e.name);
+      localSkills[e.name] = {
+        hash: hashSkillDir(fullPath),
+        version: parseSkillVersion(fullPath) ?? '1.0.0',
+        dir: fullPath,
+      };
+    }
+  }
 
-  if (skillDirs.length === 0) {
+  if (Object.keys(localSkills).length === 0) {
     const state: SessionState = { verified: {}, rejected: [], ok: true };
     writeFileSync(sessionStatePath(sessionId), JSON.stringify(state));
     console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: 'Oathbound: no skills installed — nothing to verify.' } }));
     process.exit(0);
-  }
-
-  // Hash each local skill and parse version from SKILL.md
-  const localSkills: Record<string, { hash: string; version: string }> = {};
-  for (const dir of skillDirs) {
-    const fullPath = join(skillsDir, dir.name);
-    const hash = hashSkillDir(fullPath);
-    const version = parseSkillVersion(fullPath) ?? "1.0.0"; // fallback for pre-semver installs
-    localSkills[dir.name] = { hash, version };
   }
 
   // Read enforcement config
@@ -207,7 +293,6 @@ export async function verify(supabaseUrl: string, supabaseAnonKey: string): Prom
   const enforcement: EnforcementLevel = config?.enforcement ?? 'warn';
 
   // Fetch registry data from Supabase (all versions)
-  // If enforcement=audited, also fetch audit status
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
   const selectFields = enforcement === 'audited'
     ? 'name, namespace, content_hash, version, audits(passed)'
@@ -274,7 +359,12 @@ export async function verify(supabaseUrl: string, supabaseAnonKey: string): Prom
   }
 
   const ok = rejected.length === 0;
-  const state: SessionState = { verified, rejected, ok };
+  // Build skillDirs map for verifyCheck fast path
+  const skillDirsMap: Record<string, string> = {};
+  for (const [name, { dir }] of Object.entries(localSkills)) {
+    skillDirsMap[name] = dir;
+  }
+  const state: SessionState = { verified, rejected, ok, skillDirs: skillDirsMap };
   writeFileSync(sessionStatePath(sessionId), JSON.stringify(state));
 
   if (ok && warnings.length === 0) {
@@ -287,7 +377,6 @@ export async function verify(supabaseUrl: string, supabaseAnonKey: string): Prom
     }));
     process.exit(0);
   } else if (ok && warnings.length > 0) {
-    // Warn mode — all skills allowed but with warnings
     const warnLines = warnings.map((w) => `  ⚠ ${w.name}: ${w.reason}`).join('\n');
     const names = Object.keys(verified).join(', ');
     const warnHeader = `${TEAL}${BOLD}⬡ oathbound${RESET} ${YELLOW}⚠ Unverified skills (enforcement: warn):${RESET}`;
@@ -334,7 +423,6 @@ export async function verifyCheck(): Promise<void> {
     baseName = skillNameFromPath((toolInput.file_path as string) ?? '');
   } else if (toolName === 'Glob' || toolName === 'Grep') {
     baseName = skillNameFromPath((toolInput.path as string) ?? '');
-    // Also check pattern/glob fields for skill path references
     if (!baseName) baseName = skillNameFromPath((toolInput.pattern as string) ?? '');
     if (!baseName) baseName = skillNameFromPath((toolInput.glob as string) ?? '');
   }
@@ -345,12 +433,6 @@ export async function verifyCheck(): Promise<void> {
   // Read enforcement config
   const config = readOathboundConfig();
   const enforcement: EnforcementLevel = config?.enforcement ?? 'warn';
-
-  // Check if the tool is accessing a skill in another project — not our concern
-  const skillsDir = findSkillsDir();
-  if (isExternalSkillAccess(toolName, toolInput, skillsDir, baseName)) {
-    process.exit(0);
-  }
 
   const stateFile = sessionStatePath(sessionId);
   if (!existsSync(stateFile)) process.exit(0);
@@ -363,10 +445,39 @@ export async function verifyCheck(): Promise<void> {
     process.exit(1);
   }
 
-  // Find the skill directory and re-hash
-  const skillDir = join(skillsDir, baseName);
+  // Find skill directory — use skillDirs from session state (fast path)
+  let skillDir: string | null = null;
+  if (state.skillDirs?.[baseName]) {
+    skillDir = state.skillDirs[baseName];
+  } else {
+    // Fallback: search all dirs, last match wins (local > global)
+    for (const { path: dir } of findSkillsDirs()) {
+      const candidate = join(dir, baseName);
+      if (existsSync(candidate) && statSync(candidate).isDirectory()) {
+        skillDir = candidate;
+      }
+    }
+  }
 
-  if (!existsSync(skillDir) || !statSync(skillDir).isDirectory()) {
+  // Collect all known skills dirs for external access check
+  const knownDirs: string[] = [];
+  if (state.skillDirs) {
+    // Derive parent dirs from skillDirs values
+    const parentDirs = new Set<string>();
+    for (const d of Object.values(state.skillDirs)) {
+      parentDirs.add(join(d, '..'));
+    }
+    knownDirs.push(...parentDirs);
+  } else {
+    knownDirs.push(...findSkillsDirs().map(e => e.path));
+  }
+
+  // Check if the tool is accessing a skill in another project — not our concern
+  if (knownDirs.length > 0 && isExternalSkillAccess(toolName, toolInput, knownDirs, baseName)) {
+    process.exit(0);
+  }
+
+  if (!skillDir || !existsSync(skillDir) || !statSync(skillDir).isDirectory()) {
     if (enforcement === 'warn') {
       warnSkill(baseName, 'not installed locally');
     } else {
@@ -374,7 +485,7 @@ export async function verifyCheck(): Promise<void> {
     }
   }
 
-  const currentHash = hashSkillDir(skillDir);
+  const currentHash = hashSkillDir(skillDir!);
   const sessionHash = state.verified[baseName];
 
   if (!sessionHash) {

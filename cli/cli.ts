@@ -5,7 +5,7 @@ import {
   writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync,
 } from 'node:fs';
 import { join, basename } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { intro, outro, confirm, cancel, isCancel } from '@clack/prompts';
 
 import { BRAND, TEAL, GREEN, RED, YELLOW, DIM, BOLD, RESET, usage, agentUsage, fail, spinner } from './ui';
@@ -15,19 +15,23 @@ import {
 } from './config';
 import { checkForUpdate, isNewer } from './update';
 import { isValidSemver, compareSemver } from './semver';
-import { verify, verifyCheck, findSkillsDir } from './verify';
+import { verify, verifyCheck, findSkillsDirs } from './verify';
 import { login, logout, whoami } from './auth';
 import { push } from './push';
 import { search, parseSearchArgs } from './search';
 import { agentPush } from './agent-push';
 import { agentSearch, parseAgentSearchArgs } from './agent-search';
+import { detectPackageManager, installDevDependency, addPrepareScript } from './project-setup';
+import type { PackageManager, InstallResult, PrepareResult } from './project-setup';
 
 // Re-exports for tests
 export { stripJsoncComments, writeOathboundConfig, mergeClaudeSettings, type MergeResult } from './config';
 export { isNewer } from './update';
-export { installDevDependency, type InstallResult, setup, addPrepareScript, type PrepareResult };
+export { installDevDependency, type InstallResult, addPrepareScript, type PrepareResult } from './project-setup';
+export { setup };
+export { findSkillsDirs, type SkillsDirEntry } from './verify';
 
-const VERSION = '0.15.1';
+const VERSION = '0.16.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -59,45 +63,6 @@ function parseSkillArg(arg: string): { namespace: string; name: string; version:
   return { namespace: arg.slice(0, slash), name, version: vStr };
 }
 
-// --- Package manager detection ---
-type PackageManager = 'bun' | 'pnpm' | 'yarn' | 'npm';
-
-function detectPackageManager(): PackageManager {
-  if (existsSync(join(process.cwd(), 'bun.lockb')) || existsSync(join(process.cwd(), 'bun.lock'))) return 'bun';
-  if (existsSync(join(process.cwd(), 'pnpm-lock.yaml'))) return 'pnpm';
-  if (existsSync(join(process.cwd(), 'yarn.lock'))) return 'yarn';
-  return 'npm';
-}
-
-type InstallResult = 'installed' | 'skipped' | 'failed' | 'no-package-json';
-
-function installDevDependency(): InstallResult {
-  const pkgPath = join(process.cwd(), 'package.json');
-  if (!existsSync(pkgPath)) return 'no-package-json';
-
-  try {
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-    if (pkg.devDependencies?.oathbound || pkg.dependencies?.oathbound) return 'skipped';
-  } catch {
-    // Malformed package.json — proceed with install attempt, let the package manager deal with it
-  }
-
-  const pm = detectPackageManager();
-  const cmds: Record<PackageManager, [string, string[]]> = {
-    bun: ['bun', ['add', '--dev', 'oathbound']],
-    pnpm: ['pnpm', ['add', '--save-dev', 'oathbound']],
-    yarn: ['yarn', ['add', '--dev', 'oathbound']],
-    npm: ['npm', ['install', '--save-dev', 'oathbound']],
-  };
-
-  const [bin, args] = cmds[pm];
-  try {
-    execFileSync(bin, args, { stdio: 'pipe', cwd: process.cwd() });
-    return 'installed';
-  } catch {
-    return 'failed';
-  }
-}
 
 // --- Setup command (non-interactive, idempotent, runs via prepare hook) ---
 function setup(): void {
@@ -109,32 +74,34 @@ function setup(): void {
   }
 }
 
-type PrepareResult = 'added' | 'appended' | 'skipped';
-
-function addPrepareScript(): PrepareResult {
-  const pkgPath = join(process.cwd(), 'package.json');
-  if (!existsSync(pkgPath)) return 'skipped';
-
-  let pkg: Record<string, unknown>;
-  try {
-    pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-  } catch {
-    return 'skipped'; // malformed package.json — let the package manager deal with it
-  }
-
-  const prepare = (pkg.scripts as Record<string, string> | undefined)?.prepare ?? '';
-  if (prepare.includes('oathbound setup')) return 'skipped';
-
-  const newPrepare = prepare ? `${prepare} && oathbound setup` : 'oathbound setup';
-  pkg.scripts = { ...(pkg.scripts as Record<string, string> ?? {}), prepare: newPrepare };
-  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
-  return prepare ? 'appended' : 'added';
-}
 
 // --- Init command ---
-async function init(): Promise<void> {
-  intro(BRAND);
+interface InitOptions {
+  global?: boolean;
+  local?: boolean;
+}
 
+function initGlobal(): void {
+  const home = homedir();
+  const mergeResult = mergeClaudeSettings(home);
+  switch (mergeResult) {
+    case 'created':
+      process.stderr.write(`${GREEN} ✓ Created ~/.claude/settings.json with hooks${RESET}\n`);
+      break;
+    case 'merged':
+      process.stderr.write(`${GREEN} ✓ Added hooks to ~/.claude/settings.json${RESET}\n`);
+      break;
+    case 'skipped':
+      process.stderr.write(`${DIM}   ~/.claude/settings.json already has oathbound hooks — skipped${RESET}\n`);
+      break;
+    case 'malformed':
+      process.stderr.write(`${RED} ✗ ~/.claude/settings.json is malformed JSON — skipped${RESET}\n`);
+      process.stderr.write(`${RED}   Please fix the file manually and re-run oathbound init --global${RESET}\n`);
+      break;
+  }
+}
+
+async function initLocal(): Promise<void> {
   const level: EnforcementLevel = 'warn';
 
   // Install as devDependency
@@ -197,7 +164,7 @@ async function init(): Promise<void> {
     process.stderr.write(`${DIM}   .oathbound.jsonc already exists — skipped${RESET}\n`);
   }
 
-  // Merge hooks into .claude/settings.json
+  // Merge hooks into local .claude/settings.json
   const mergeResult = mergeClaudeSettings();
   switch (mergeResult) {
     case 'created':
@@ -214,12 +181,32 @@ async function init(): Promise<void> {
       process.stderr.write(`${RED}   Please fix the file manually and re-run oathbound init${RESET}\n`);
       break;
   }
+}
+
+async function init(options: InitOptions = {}): Promise<void> {
+  intro(BRAND);
+
+  if (options.global && !options.local) {
+    // --global only: write hooks to ~/.claude/settings.json
+    initGlobal();
+  } else if (options.local && !options.global) {
+    // --local only: existing local behavior
+    await initLocal();
+  } else {
+    // Default (no flags or both): global + local
+    initGlobal();
+    await initLocal();
+  }
 
   outro(`🎉 Oath Bound set up complete!`);
 }
 
 // --- Pull command ---
-async function pull(skillArg: string): Promise<void> {
+interface PullOptions {
+  global?: boolean;
+}
+
+async function pull(skillArg: string, options: PullOptions = {}): Promise<void> {
   const parsed = parseSkillArg(skillArg);
   if (!parsed) usage();
   const { namespace, name, version } = parsed;
@@ -285,12 +272,21 @@ async function pull(skillArg: string): Promise<void> {
   }
 
   // 4. Find target directory and extract
-  let skillsDir = findSkillsDir();
-  if (!skillsDir.endsWith('.claude/skills') && !skillsDir.includes('.claude/skills')) {
-    // findSkillsDir() fell back to cwd — create .claude/skills instead of extracting into project root
-    skillsDir = join(process.cwd(), '.claude', 'skills');
+  let skillsDir: string;
+  if (options.global) {
+    skillsDir = join(homedir(), '.claude', 'skills');
     mkdirSync(skillsDir, { recursive: true });
-    console.log(`${DIM}   Created ${skillsDir}${RESET}`);
+  } else {
+    // Find local skills dir
+    const dirs = findSkillsDirs();
+    const localEntry = dirs.find(d => d.source === 'local');
+    if (localEntry) {
+      skillsDir = localEntry.path;
+    } else {
+      skillsDir = join(process.cwd(), '.claude', 'skills');
+      mkdirSync(skillsDir, { recursive: true });
+      console.log(`${DIM}   Created ${skillsDir}${RESET}`);
+    }
   }
   writeFileSync(tarFile, buffer);
   try {
@@ -509,7 +505,11 @@ if (subcommand !== 'verify' && subcommand !== 'setup') {
 }
 
 if (subcommand === 'init') {
-  await init().catch((err: unknown) => {
+  const initArgs = args.slice(1);
+  await init({
+    global: initArgs.includes('--global'),
+    local: initArgs.includes('--local'),
+  }).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Init failed', msg);
   });
@@ -559,13 +559,15 @@ if (subcommand === 'init') {
   });
 } else {
   const PULL_ALIASES = new Set(['pull', 'i', 'install']);
-  const skillArg = args[1];
+  const pullArgs = args.slice(1);
+  const isGlobalPull = pullArgs.includes('--global');
+  const skillArg = pullArgs.find(a => !a.startsWith('--'));
 
   if (!subcommand || !PULL_ALIASES.has(subcommand) || !skillArg) {
     usage();
   }
 
-  await pull(skillArg).catch((err: unknown) => {
+  await pull(skillArg, { global: isGlobalPull }).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Unexpected error', msg);
   });

@@ -21,9 +21,9 @@ export function usage(exitCode = 1): never {
 ${BOLD}oathbound${RESET} — install, verify, and publish skills & agents
 
 ${DIM}Usage:${RESET}
-  oathbound init                ${DIM}Setup wizard — configure project${RESET}
-  oathbound pull <namespace/skill-name[@version]>
-  oathbound install <namespace/skill-name[@version]>
+  oathbound init [--global|--local]  ${DIM}Setup wizard (default: global + local)${RESET}
+  oathbound pull <namespace/skill-name[@version]> [--global]
+  oathbound install <namespace/skill-name[@version]> [--global]
   oathbound push [path] [--private]  ${DIM}Publish a skill to the registry${RESET}
   oathbound search [query]            ${DIM}Search skills in the registry${RESET}
   oathbound list                      ${DIM}List all public skills${RESET}

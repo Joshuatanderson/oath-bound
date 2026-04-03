@@ -97,8 +97,9 @@ function hasOathboundHooks(settings: Record<string, unknown>): boolean {
 
 export type MergeResult = 'created' | 'merged' | 'skipped' | 'malformed';
 
-export function mergeClaudeSettings(): MergeResult {
-  const claudeDir = join(process.cwd(), '.claude');
+export function mergeClaudeSettings(targetDir?: string): MergeResult {
+  const baseDir = targetDir ?? process.cwd();
+  const claudeDir = join(baseDir, '.claude');
   const settingsPath = join(claudeDir, 'settings.json');
 
   if (!existsSync(settingsPath)) {
