@@ -312,7 +312,7 @@ export default function SubmitPage() {
           </h2>
           <p className="text-sm text-muted-foreground">
             You need to verify your identity before you can publish skills on
-            Oath Bound.
+            Oathbound.
           </p>
           <Button
             size="lg"
@@ -397,7 +397,7 @@ export default function SubmitPage() {
             Sign in to submit skills
           </h2>
           <p className="text-sm text-muted-foreground">
-            You need to be signed in to publish skills on Oath Bound.
+            You need to be signed in to publish skills on Oathbound.
           </p>
           <Button asChild size="lg" className="w-fit">
             <a href="/login">Sign in</a>
