@@ -6,11 +6,12 @@ import {
 } from 'node:fs';
 import { join, basename } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
-import { intro, outro, confirm, cancel, isCancel } from '@clack/prompts';
+import { intro, outro, confirm, cancel, isCancel, select } from '@clack/prompts';
 
 import { BRAND, TEAL, GREEN, RED, YELLOW, DIM, BOLD, RESET, usage, agentUsage, fail, spinner } from './ui';
 import {
   stripJsoncComments, writeOathboundConfig, mergeClaudeSettings,
+  settingsHaveOathboundHooks,
   type EnforcementLevel, type MergeResult,
 } from './config';
 import { checkForUpdate, isNewer } from './update';
@@ -31,7 +32,7 @@ export { installDevDependency, type InstallResult, addPrepareScript, type Prepar
 export { setup };
 export { findSkillsDirs, type SkillsDirEntry } from './verify';
 
-const VERSION = '0.16.0';
+const VERSION = '0.17.0';
 
 // --- Supabase ---
 const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
@@ -201,6 +202,41 @@ async function init(options: InitOptions = {}): Promise<void> {
   outro(`🎉 Oath Bound set up complete!`);
 }
 
+// --- Guided pull: ensure hooks are initialized before pulling ---
+async function ensureInitialized(): Promise<void> {
+  const globalSettings = join(homedir(), '.claude', 'settings.json');
+  const localSettings = join(process.cwd(), '.claude', 'settings.json');
+
+  if (settingsHaveOathboundHooks(globalSettings) || settingsHaveOathboundHooks(localSettings)) {
+    return;
+  }
+
+  if (!process.stdin.isTTY) {
+    process.stderr.write('oathbound: no hooks configured. Run `npx oathbound init` first.\n');
+    process.exit(1);
+  }
+
+  process.stderr.write(`\n${BRAND} ${YELLOW}No oathbound hooks detected.${RESET}\n`);
+  process.stderr.write(`${DIM}   Hooks verify skills on every Claude Code session.${RESET}\n\n`);
+
+  const scope = await select({
+    message: 'Where should oathbound install hooks?',
+    options: [
+      { value: 'both', label: 'Global + this project', hint: 'recommended' },
+      { value: 'global', label: 'Global only', hint: '~/.claude/settings.json' },
+      { value: 'local', label: 'This project only', hint: '.claude/settings.json' },
+    ],
+  });
+
+  if (isCancel(scope)) {
+    cancel('Pull cancelled.');
+    process.exit(1);
+  }
+
+  if (scope === 'both' || scope === 'global') initGlobal();
+  if (scope === 'both' || scope === 'local') await initLocal();
+}
+
 // --- Pull command ---
 interface PullOptions {
   global?: boolean;
@@ -211,6 +247,8 @@ async function pull(skillArg: string, options: PullOptions = {}): Promise<void> 
   if (!parsed) usage();
   const { namespace, name, version } = parsed;
   const fullName = `${namespace}/${name}`;
+
+  await ensureInitialized();
 
   console.log(`\n${BRAND} ${TEAL}↓ Pulling ${fullName}${version ? `@${version}` : ''}...${RESET}`);
 
@@ -517,7 +555,7 @@ if (subcommand === 'init') {
   setup();
 } else if (subcommand === 'verify') {
   const isCheck = args.includes('--check');
-  const run = isCheck ? verifyCheck : () => verify(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const run = isCheck ? verifyCheck : () => verify(SUPABASE_URL, SUPABASE_ANON_KEY, VERSION);
   await run().catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     process.stderr.write(`oathbound verify: ${msg}\n`);

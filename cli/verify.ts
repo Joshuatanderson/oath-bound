@@ -113,7 +113,7 @@ export function findSkillsDirs(): SkillsDirEntry[] {
 }
 
 /** Auto-configure a project that has skills but no oathbound config. Fire-and-forget. */
-function propagateToProject(): void {
+function propagateToProject(version: string): void {
   try {
     const cwd = process.cwd();
     const localSkills = join(cwd, '.claude', 'skills');
@@ -130,7 +130,7 @@ function propagateToProject(): void {
     const raw = readFileSync(pkgPath, 'utf-8');
     const pkg = JSON.parse(raw);
     if (!pkg.devDependencies?.oathbound && !pkg.dependencies?.oathbound) {
-      pkg.devDependencies = { ...(pkg.devDependencies ?? {}), oathbound: 'latest' };
+      pkg.devDependencies = { ...(pkg.devDependencies ?? {}), oathbound: `^${version}` };
       const indent = raw.match(/^(\s+)/m)?.[1]?.length ?? 2;
       writeFileSync(pkgPath, JSON.stringify(pkg, null, indent) + '\n');
     }
@@ -241,7 +241,7 @@ function parseSkillVersion(skillDir: string): string | null {
 }
 
 // --- Verify (SessionStart hook) ---
-export async function verify(supabaseUrl: string, supabaseAnonKey: string): Promise<void> {
+export async function verify(supabaseUrl: string, supabaseAnonKey: string, version: string): Promise<void> {
   let input: Record<string, unknown>;
   try {
     input = JSON.parse(await readStdin());
@@ -258,7 +258,7 @@ export async function verify(supabaseUrl: string, supabaseAnonKey: string): Prom
   const skillsDirs = findSkillsDirs();
 
   // Auto-propagate config to project if conditions met
-  propagateToProject();
+  propagateToProject(version);
 
   if (skillsDirs.length === 0) {
     const state: SessionState = { verified: {}, rejected: [], ok: true };

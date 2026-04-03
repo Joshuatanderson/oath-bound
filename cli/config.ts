@@ -78,7 +78,7 @@ const OATHBOUND_HOOKS = {
   ],
 };
 
-function hasOathboundHooks(settings: Record<string, unknown>): boolean {
+export function hasOathboundHooks(settings: Record<string, unknown>): boolean {
   const hooks = settings.hooks as Record<string, unknown[]> | undefined;
   if (!hooks) return false;
   for (const entries of Object.values(hooks)) {
@@ -126,4 +126,15 @@ export function mergeClaudeSettings(targetDir?: string): MergeResult {
   settings.hooks = hooks;
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
   return 'merged';
+}
+
+/** Check if a settings.json file at the given path contains oathbound hooks. */
+export function settingsHaveOathboundHooks(settingsPath: string): boolean {
+  if (!existsSync(settingsPath)) return false;
+  try {
+    const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+    return hasOathboundHooks(settings);
+  } catch {
+    return false;
+  }
 }
