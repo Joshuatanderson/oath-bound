@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Copy, Check } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { getBrowserClient } from "@/lib/supabase.client";
 import type { User } from "@supabase/supabase-js";
 
@@ -21,7 +21,6 @@ const supabase = getBrowserClient();
 export function SiteHeader() {
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
@@ -65,21 +64,12 @@ export function SiteHeader() {
             >
               Docs
             </Link>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/llms`);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              }}
-              className="flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
+            <Link
+              href="/llms"
+              className="text-muted-foreground transition-colors hover:text-foreground"
             >
               llms.txt
-              {copied ? (
-                <Check className="h-3 w-3 text-green-500" />
-              ) : (
-                <Copy className="h-3 w-3" />
-              )}
-            </button>
+            </Link>
           </nav>
         </div>
 
