@@ -81,9 +81,6 @@ export async function POST(request: Request) {
 
   const personaData = await personaRes.json();
 
-  // Log the full response (sandbox data — safe to inspect)
-  console.log("[Persona] Full inquiry response:", JSON.stringify(personaData, null, 2));
-
   const inquiry = personaData.data?.attributes;
 
   if (!inquiry) {

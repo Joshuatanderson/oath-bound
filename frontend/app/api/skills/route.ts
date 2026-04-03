@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getServerClient } from "@/lib/supabase.server";
-import { getAdminClient } from "@/lib/supabase.admin";
+import { getAdminClient, identityVerifiedGate } from "@/lib/supabase.admin";
 import { createTarBuffer, hashTar } from "@/lib/tar";
 import { contentHash } from "@/lib/content-hash";
 import {
@@ -218,19 +218,10 @@ export async function POST(request: Request) {
   }
 
   // Enforce identity verification before allowing skill submission
-  const admin = getAdminClient();
-  const { data: verification } = await admin
-    .from("identity_verifications")
-    .select("status")
-    .eq("user_id", userRecord.id)
-    .single();
+  const gate = await identityVerifiedGate(userRecord.id);
+  if (gate) return gate;
 
-  if (verification?.status !== "approved") {
-    return NextResponse.json(
-      { error: "Identity verification required before submitting skills" },
-      { status: 403 }
-    );
-  }
+  const admin = getAdminClient();
 
   const namespace = userRecord.username;
 

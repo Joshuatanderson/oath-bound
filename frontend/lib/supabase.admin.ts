@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
 import type { Database } from "./database.types";
 
 /**
@@ -14,4 +15,25 @@ export function getAdminClient() {
   }
 
   return createClient<Database>(url, key);
+}
+
+/**
+ * Returns a 403 NextResponse if the user hasn't completed identity verification.
+ * Returns null if verification is approved (caller should proceed).
+ */
+export async function identityVerifiedGate(userId: string): Promise<NextResponse | null> {
+  const admin = getAdminClient();
+  const { data: verification } = await admin
+    .from("identity_verifications")
+    .select("status")
+    .eq("user_id", userId)
+    .single();
+
+  if (verification?.status !== "approved") {
+    return NextResponse.json(
+      { error: "Identity verification required" },
+      { status: 403 }
+    );
+  }
+  return null;
 }

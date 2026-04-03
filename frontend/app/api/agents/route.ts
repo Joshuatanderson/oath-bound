@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
 import { getServerClient } from "@/lib/supabase.server";
-import { getAdminClient } from "@/lib/supabase.admin";
+import { getAdminClient, identityVerifiedGate } from "@/lib/supabase.admin";
 import {
   validateAgent,
   serializeAgentFile,
@@ -278,6 +278,10 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  // Enforce identity verification before allowing agent submission
+  const gate = await identityVerifiedGate(userRecord.id);
+  if (gate) return gate;
 
   const namespace = userRecord.username;
   const admin = getAdminClient();
