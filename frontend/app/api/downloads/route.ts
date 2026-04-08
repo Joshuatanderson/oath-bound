@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
-import { getAdminClient } from "@/lib/supabase.admin";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VERSION_RE = /^[a-zA-Z0-9.\-_+]{1,64}$/;
 
 export async function POST(request: Request) {
-  const admin = getAdminClient();
+  const supabase = createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
+  );
 
   let body: { skill_id?: string; agent_id?: string; version: string };
   try {
@@ -44,7 +48,7 @@ export async function POST(request: Request) {
 
   // Validate the referenced entity exists
   if (skill_id) {
-    const { data } = await admin
+    const { data } = await supabase
       .from("skills")
       .select("id")
       .eq("id", skill_id)
@@ -53,7 +57,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
   } else {
-    const { data } = await admin
+    const { data } = await supabase
       .from("agents")
       .select("id")
       .eq("id", agent_id!)
@@ -63,7 +67,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const { error } = await admin.from("downloads").insert({
+  const { error } = await supabase.from("downloads").insert({
     skill_id: skill_id ?? null,
     agent_id: agent_id ?? null,
     version,

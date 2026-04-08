@@ -41,7 +41,8 @@ export async function GET(request: Request) {
       audits (id, passed)
     `)
     .eq('visibility', 'public')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(1000);
 
   if (namespace) {
     query = query.eq('namespace', namespace);
