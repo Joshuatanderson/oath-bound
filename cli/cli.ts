@@ -32,7 +32,7 @@ export { installDevDependency, type InstallResult, addPrepareScript, type Prepar
 export { setup };
 export { findSkillsDirs, type SkillsDirEntry } from './verify';
 
-const VERSION = '0.17.2';
+const VERSION = '0.17.3';
 
 // --- Supabase ---
 import { SUPABASE_URL, SUPABASE_ANON_KEY, API_BASE } from './constants';
@@ -205,20 +205,21 @@ async function ensureInitialized(): Promise<void> {
   const globalSettings = join(homedir(), '.claude', 'settings.json');
   const localSettings = join(process.cwd(), '.claude', 'settings.json');
 
-  if (settingsHaveOathboundHooks(globalSettings) || settingsHaveOathboundHooks(localSettings)) {
-    return;
-  }
+  const hasGlobal = settingsHaveOathboundHooks(globalSettings);
+  const hasLocal = settingsHaveOathboundHooks(localSettings);
+
+  if (hasGlobal && hasLocal) return;
 
   if (!process.stdin.isTTY) {
     process.stderr.write('oathbound: no hooks configured. Run `npx oathbound init` first.\n');
     process.exit(1);
   }
 
-  process.stderr.write(`\n${BRAND} ${YELLOW}No oathbound hooks detected. Setting up...${RESET}\n`);
+  process.stderr.write(`\n${BRAND} ${YELLOW}Setting up oathbound hooks...${RESET}\n`);
   process.stderr.write(`${DIM}   Hooks verify skills on every Claude Code session.${RESET}\n\n`);
 
-  initGlobal();
-  await initLocal();
+  if (!hasGlobal) initGlobal();
+  if (!hasLocal) await initLocal();
 }
 
 // --- Pull command ---
