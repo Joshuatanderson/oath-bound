@@ -32,7 +32,7 @@ export { installDevDependency, type InstallResult, addPrepareScript, type Prepar
 export { setup };
 export { findSkillsDirs, type SkillsDirEntry } from './verify';
 
-const VERSION = '0.17.1';
+const VERSION = '0.17.2';
 
 // --- Supabase ---
 import { SUPABASE_URL, SUPABASE_ANON_KEY, API_BASE } from './constants';
@@ -214,30 +214,17 @@ async function ensureInitialized(): Promise<void> {
     process.exit(1);
   }
 
-  process.stderr.write(`\n${BRAND} ${YELLOW}No oathbound hooks detected.${RESET}\n`);
+  process.stderr.write(`\n${BRAND} ${YELLOW}No oathbound hooks detected. Setting up...${RESET}\n`);
   process.stderr.write(`${DIM}   Hooks verify skills on every Claude Code session.${RESET}\n\n`);
 
-  const scope = await select({
-    message: 'Where should oathbound install hooks?',
-    options: [
-      { value: 'both', label: 'Global + this project', hint: 'recommended' },
-      { value: 'global', label: 'Global only', hint: '~/.claude/settings.json' },
-      { value: 'local', label: 'This project only', hint: '.claude/settings.json' },
-    ],
-  });
-
-  if (isCancel(scope)) {
-    cancel('Pull cancelled.');
-    process.exit(1);
-  }
-
-  if (scope === 'both' || scope === 'global') initGlobal();
-  if (scope === 'both' || scope === 'local') await initLocal();
+  initGlobal();
+  await initLocal();
 }
 
 // --- Pull command ---
 interface PullOptions {
   global?: boolean;
+  local?: boolean;
 }
 
 async function pull(skillArg: string, options: PullOptions = {}): Promise<void> {
@@ -307,34 +294,47 @@ async function pull(skillArg: string, options: PullOptions = {}): Promise<void> 
     fail('Verification failed', `Downloaded file does not match expected hash for ${fullName}`);
   }
 
-  // 4. Find target directory and extract
-  let skillsDir: string;
-  if (options.global) {
-    skillsDir = join(homedir(), '.claude', 'skills');
-    mkdirSync(skillsDir, { recursive: true });
-  } else {
-    // Find local skills dir
+  // 4. Determine target directories
+  // Default: install to both global and local. Flags narrow to one.
+  const installGlobal = !options.local;
+  const installLocal = !options.global;
+
+  const targets: string[] = [];
+
+  if (installGlobal) {
+    const globalDir = join(homedir(), '.claude', 'skills');
+    mkdirSync(globalDir, { recursive: true });
+    targets.push(globalDir);
+  }
+
+  if (installLocal) {
     const dirs = findSkillsDirs();
     const localEntry = dirs.find(d => d.source === 'local');
+    let localDir: string;
     if (localEntry) {
-      skillsDir = localEntry.path;
+      localDir = localEntry.path;
     } else {
-      skillsDir = join(process.cwd(), '.claude', 'skills');
-      mkdirSync(skillsDir, { recursive: true });
-      console.log(`${DIM}   Created ${skillsDir}${RESET}`);
+      localDir = join(process.cwd(), '.claude', 'skills');
+      mkdirSync(localDir, { recursive: true });
+      console.log(`${DIM}   Created ${localDir}${RESET}`);
     }
+    targets.push(localDir);
   }
+
+  // 5. Extract to all target directories
   writeFileSync(tarFile, buffer);
-  try {
-    execFileSync('tar', ['-xf', tarFile, '-C', skillsDir], { stdio: 'pipe' });
-  } catch (e: unknown) {
-    unlinkSync(tarFile);
-    const msg = e instanceof Error ? e.message : 'Unknown error';
-    fail('Extraction failed', msg);
+  for (const dir of targets) {
+    try {
+      execFileSync('tar', ['-xf', tarFile, '-C', dir], { stdio: 'pipe' });
+    } catch (e: unknown) {
+      unlinkSync(tarFile);
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      fail('Extraction failed', msg);
+    }
   }
   unlinkSync(tarFile);
 
-  // 5. Record download (non-fatal)
+  // 6. Record download (non-fatal)
   try {
     const trackRes = await fetch(`${API_BASE}/api/downloads`, {
       method: 'POST',
@@ -348,10 +348,12 @@ async function pull(skillArg: string, options: PullOptions = {}): Promise<void> 
     // Network error — non-fatal
   }
 
-  // 6. Success
+  // 7. Success
   console.log(`${BOLD}${GREEN} ✓ Skill verified${RESET}`);
   console.log(`${DIM}   ${fullName} v${skill.version}${RESET}`);
-  console.log(`${DIM}   → ${join(skillsDir, name)}${RESET}`);
+  for (const dir of targets) {
+    console.log(`${DIM}   → ${join(dir, name)}${RESET}`);
+  }
 }
 
 // --- Agent types ---
@@ -596,14 +598,15 @@ if (subcommand === 'init') {
 } else {
   const PULL_ALIASES = new Set(['pull', 'i', 'install']);
   const pullArgs = args.slice(1);
-  const isGlobalPull = pullArgs.includes('--global');
-  const skillArg = pullArgs.find(a => !a.startsWith('--'));
+  const isGlobalPull = pullArgs.includes('--global') || pullArgs.includes('-g');
+  const isLocalPull = pullArgs.includes('--local') || pullArgs.includes('-l');
+  const skillArg = pullArgs.find(a => !a.startsWith('-'));
 
   if (!subcommand || !PULL_ALIASES.has(subcommand) || !skillArg) {
     usage();
   }
 
-  await pull(skillArg, { global: isGlobalPull }).catch((err: unknown) => {
+  await pull(skillArg, { global: isGlobalPull, local: isLocalPull }).catch((err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     fail('Unexpected error', msg);
   });
