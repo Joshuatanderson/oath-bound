@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase.client";
+import type { Session } from "@supabase/supabase-js";
 
 function CLILoginInner() {
   const searchParams = useSearchParams();
@@ -17,7 +18,7 @@ function CLILoginInner() {
     const supabase = getBrowserClient();
 
     // First check if the user already has a session (already logged in)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       if (session?.access_token && session?.refresh_token) {
         setStatus("Redirecting to CLI...");
         redirectToCLI(port, session);

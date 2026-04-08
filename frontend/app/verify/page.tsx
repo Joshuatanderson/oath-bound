@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, ShieldCheck, ShieldX, ArrowLeft } from "lucide-react";
 import { getBrowserClient } from "@/lib/supabase.client";
+import type { UserResponse } from "@supabase/supabase-js";
 
 const supabase = getBrowserClient();
 
@@ -36,7 +37,7 @@ function VerifyContent() {
 
   // On mount: check auth + verification status
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data }: UserResponse) => {
       if (!data.user) {
         router.replace("/login");
         return;

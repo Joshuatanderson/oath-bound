@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { User } from "@supabase/supabase-js";
+import type { User, UserResponse } from "@supabase/supabase-js";
 import {
   Select,
   SelectContent,
@@ -60,7 +60,7 @@ export default function SubmitPage() {
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data }: UserResponse) => {
       setUser(data.user);
       if (data.user) {
         fetch("/api/verify/status")

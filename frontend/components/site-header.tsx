@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogOut } from "lucide-react";
 import { getBrowserClient } from "@/lib/supabase.client";
-import type { User } from "@supabase/supabase-js";
+import type { User, UserResponse } from "@supabase/supabase-js";
 
 const supabase = getBrowserClient();
 
@@ -23,7 +23,7 @@ export function SiteHeader() {
   const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    supabase.auth.getUser().then(({ data }: UserResponse) => setUser(data.user));
     const match = document.cookie.match(/(?:^|; )ob_username=([^;]*)/);
     if (match) {
       try { setUsername(decodeURIComponent(match[1])); } catch { /* malformed cookie */ }

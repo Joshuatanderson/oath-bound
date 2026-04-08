@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Check, X, Loader2 } from "lucide-react";
 import { getBrowserClient } from "@/lib/supabase.client";
+import type { UserResponse } from "@supabase/supabase-js";
 import { USERNAME_RE } from "@/lib/username";
 
 const supabase = getBrowserClient();
@@ -24,7 +25,7 @@ export default function SetupPage() {
 
   // On mount: if not signed in, go to /login. If already has username, go to /.
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data }: UserResponse) => {
       if (!data.user) {
         router.replace("/login");
         return;
