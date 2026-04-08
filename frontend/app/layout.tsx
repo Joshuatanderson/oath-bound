@@ -16,8 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Oathbound",
-  description: "Skills attestation protocol",
+  title: { default: 'Oathbound', template: '%s | Oathbound' },
+  description: 'Verified developers. Audited skills. Cryptographic proof.',
+  metadataBase: new URL('https://www.oathbound.ai'),
+  openGraph: { type: 'website', siteName: 'Oathbound', locale: 'en_US' },
+  twitter: { card: 'summary_large_image' },
 };
 
 export default function RootLayout({

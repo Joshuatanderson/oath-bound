@@ -1,5 +1,6 @@
 export const metadata = {
-  title: "Privacy Policy | Oathbound",
+  title: "Privacy Policy",
+  description: "How Oathbound handles your data and privacy.",
 };
 
 export default function PrivacyPage() {

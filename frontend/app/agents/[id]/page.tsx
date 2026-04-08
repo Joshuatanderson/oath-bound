@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getServerClient } from "@/lib/supabase.server";
@@ -45,6 +46,23 @@ function ChainLink({
       </a>
     </div>
   );
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const admin = getAdminClient();
+  const { data: agent } = await admin
+    .from("agents")
+    .select("name, namespace, description")
+    .eq("id", id)
+    .single();
+
+  if (!agent) return { title: "Agent Not Found" };
+
+  return {
+    title: `${agent.name} by ${agent.namespace}`,
+    description: agent.description?.slice(0, 160),
+  };
 }
 
 export default async function AgentPage({

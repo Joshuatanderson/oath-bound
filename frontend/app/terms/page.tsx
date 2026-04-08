@@ -1,5 +1,6 @@
 export const metadata = {
-  title: "Terms of Service | Oathbound",
+  title: "Terms of Service",
+  description: "Terms of Service for using the Oathbound platform.",
 };
 
 export default function TermsPage() {

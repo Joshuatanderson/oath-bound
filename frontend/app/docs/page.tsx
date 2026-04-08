@@ -4,7 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 export const metadata = {
-  title: "Docs | Oathbound",
+  title: "Docs",
   description:
     "Documentation for Oathbound — the trust and verification layer for Claude Code skills.",
 };

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getServerClient } from "@/lib/supabase.server";
@@ -33,6 +34,23 @@ function ChainLink({ label, type, hash }: { label: string; type: "tx" | "object"
       </a>
     </div>
   );
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const admin = getAdminClient();
+  const { data: skill } = await admin
+    .from("skills")
+    .select("name, namespace, description")
+    .eq("id", id)
+    .single();
+
+  if (!skill) return { title: "Skill Not Found" };
+
+  return {
+    title: `${skill.name} by ${skill.namespace}`,
+    description: skill.description?.slice(0, 160),
+  };
 }
 
 export default async function SkillPage({

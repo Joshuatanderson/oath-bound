@@ -11,6 +11,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ShieldCheck, Bot, Lock, Cpu, Shield, Download } from "lucide-react";
 
+export const metadata = {
+  title: 'Agents',
+  description: 'Browse verified agent configurations for Claude Code.',
+};
+
 export default async function AgentsPage() {
   const supabase = await getServerClient();
 

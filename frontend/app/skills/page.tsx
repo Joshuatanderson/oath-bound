@@ -11,6 +11,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ShieldCheck, FileCheck, User, Lock, Download } from "lucide-react";
 
+export const metadata = {
+  title: 'Skills',
+  description: 'Browse verified and audited skills for Claude Code.',
+};
+
 export default async function SkillsPage() {
   const supabase = await getServerClient();
 
