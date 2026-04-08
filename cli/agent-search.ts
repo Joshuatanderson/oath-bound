@@ -1,6 +1,6 @@
 import { BRAND, TEAL, GREEN, DIM, BOLD, RESET, fail, spinner } from './ui';
 
-const API_BASE = process.env.OATHBOUND_API_URL ?? 'https://www.oathbound.ai';
+import { API_BASE } from './constants';
 
 export interface AgentSearchOptions {
   query?: string;

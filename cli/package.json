@@ -1,6 +1,6 @@
 {
   "name": "oathbound",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "description": "Install verified Claude Code skills and agents from the Oath Bound registry",
   "license": "MIT",
   "author": "Josh Anderson",

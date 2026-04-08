@@ -7,7 +7,7 @@ import { getAccessToken } from './auth';
 import { collectFiles } from './content-hash';
 import { isValidSemver } from './semver';
 
-const API_BASE = process.env.OATHBOUND_API_URL ?? 'https://www.oathbound.ai';
+import { API_BASE } from './constants';
 
 export async function push(pathArg?: string, options?: { private?: boolean }): Promise<void> {
   intro(BRAND);

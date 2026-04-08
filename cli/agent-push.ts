@@ -6,7 +6,7 @@ import { BRAND, GREEN, DIM, BOLD, RESET, fail, spinner } from './ui';
 import { getAccessToken } from './auth';
 import { isValidSemver } from './semver';
 
-const API_BASE = process.env.OATHBOUND_API_URL ?? 'https://www.oathbound.ai';
+import { API_BASE } from './constants';
 
 /** Parse YAML frontmatter from an agent .md file. */
 function parseAgentFrontmatter(content: string): {

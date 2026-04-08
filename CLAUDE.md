@@ -42,6 +42,9 @@ your context is critical. Do not pollute it.
 - if you are interacting w an api that is one off, don't worry about making a skill.
 - if you are interacting with an api that will likely be used again, consider making a skill - this can be a subagent/team's task, and then all future instances will benefit.
 
+## CLI Constants
+- All shared CLI constants (URLs, keys, etc.) live in `cli/constants.ts`. Never hardcode these as magic strings in individual files — always import from `constants.ts`.
+
 ## CLI Versioning
 - **This project is in beta. Do NOT publish a 1.x version.** All versions must stay 0.x.x until explicitly told otherwise.
 - After any CLI change, bump the version in BOTH `cli/cli.ts` (`VERSION` const) AND `cli/package.json` following semver:

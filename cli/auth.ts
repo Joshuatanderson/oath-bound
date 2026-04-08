@@ -9,9 +9,7 @@ import { homedir } from 'node:os';
 import { intro, outro } from '@clack/prompts';
 import { BRAND, GREEN, DIM, BOLD, RESET, fail, spinner } from './ui';
 
-const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_T-rk0azNRqAMLLGCyadyhQ_ulk9685n';
-const API_BASE = process.env.OATHBOUND_API_URL ?? 'https://www.oathbound.ai';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, API_BASE } from './constants';
 
 const AUTH_DIR = join(homedir(), '.oathbound');
 const AUTH_FILE = join(AUTH_DIR, 'auth.json');

@@ -193,6 +193,15 @@ function warnSkill(skillName: string, reason: string): never {
   process.exit(0);
 }
 
+/** Route to warn or deny based on enforcement level. */
+function enforceSkill(skillName: string, reason: string, enforcement: EnforcementLevel): never {
+  if (enforcement === 'warn') {
+    warnSkill(skillName, reason);
+  } else {
+    denySkill(skillName, reason, enforcement);
+  }
+}
+
 /** Check if a tool operation references a skill in another project, not ours. */
 function isExternalSkillAccess(
   toolName: string,
@@ -478,30 +487,18 @@ export async function verifyCheck(): Promise<void> {
   }
 
   if (!skillDir || !existsSync(skillDir) || !statSync(skillDir).isDirectory()) {
-    if (enforcement === 'warn') {
-      warnSkill(baseName, 'not installed locally');
-    } else {
-      denySkill(baseName, 'not installed locally', enforcement);
-    }
+    enforceSkill(baseName, 'not installed locally', enforcement);
   }
 
-  const currentHash = hashSkillDir(skillDir!);
+  const currentHash = hashSkillDir(skillDir);
   const sessionHash = state.verified[baseName];
 
   if (!sessionHash) {
-    if (enforcement === 'warn') {
-      warnSkill(baseName, 'not verified at session start');
-    } else {
-      denySkill(baseName, 'not verified at session start', enforcement);
-    }
+    enforceSkill(baseName, 'not verified at session start', enforcement);
   }
 
   if (currentHash !== sessionHash) {
-    if (enforcement === 'warn') {
-      warnSkill(baseName, `modified since session start (${currentHash.slice(0, 8)}… ≠ ${sessionHash.slice(0, 8)}…)`);
-    } else {
-      denySkill(baseName, `modified since session start — tampering detected (${currentHash.slice(0, 8)}… ≠ ${sessionHash.slice(0, 8)}…)`, enforcement);
-    }
+    enforceSkill(baseName, `modified since session start (${currentHash.slice(0, 8)}… ≠ ${sessionHash.slice(0, 8)}…)`, enforcement);
   }
 
   process.stderr.write(`${GREEN}   ${baseName}: ${currentHash} ✓${RESET}\n`);

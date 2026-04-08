@@ -32,12 +32,10 @@ export { installDevDependency, type InstallResult, addPrepareScript, type Prepar
 export { setup };
 export { findSkillsDirs, type SkillsDirEntry } from './verify';
 
-const VERSION = '0.17.0';
+const VERSION = '0.17.1';
 
 // --- Supabase ---
-const SUPABASE_URL = 'https://mjnfqagwuewhgwbtrdgs.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_T-rk0azNRqAMLLGCyadyhQ_ulk9685n';
-const API_BASE = process.env.OATHBOUND_API_URL ?? 'https://www.oathbound.ai';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, API_BASE } from './constants';
 
 // --- Types ---
 interface SkillRow {

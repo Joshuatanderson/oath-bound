@@ -52,7 +52,7 @@ describe('parseSearchArgs', () => {
 // Skipped in CI — the API may not be deployed yet when tests run.
 // Run locally with: bun test search.test.ts
 
-const API_BASE = process.env.OATHBOUND_API_URL ?? 'https://www.oathbound.ai';
+import { API_BASE } from './constants';
 const isCI = !!process.env.CI;
 
 describe.skipIf(isCI)('GET /api/skills (live)', () => {
