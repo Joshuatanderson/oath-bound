@@ -174,13 +174,10 @@ The route rebuilds meta inline with the exact same field-by-field conditional as
 
 ---
 
-### Issue 16: CLI constants duplicated
+### ~~Issue 16: CLI constants duplicated~~ ✅
 **Files:** `cli/cli.ts` (lines 38-39), `cli/auth.ts` (lines 12-13)
 **Severity:** Low
-
-`SUPABASE_URL` and `SUPABASE_ANON_KEY` are hardcoded identically in two files.
-
-**Fix:** Extract to `cli/constants.ts`.
+**Status:** Fixed — extracted `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `API_BASE` to `cli/constants.ts`. Updated all 7 consuming files.
 
 ---
 
@@ -196,13 +193,10 @@ The pattern `if (enforcement === 'warn') { warnSkill(...) } else { denySkill(...
 
 ## Nice-to-Have Improvements
 
-### Issue 18: Skills GET has no query limit
+### ~~Issue 18: Skills GET has no query limit~~ ✅
 **File:** `frontend/app/api/skills/route.ts` (lines 36-55)
 **Severity:** Medium
-
-No `.limit()` on the initial query -- loads ALL public skills into memory for JS-side deduplication. Agents route has `.limit(1000)`.
-
-**Fix:** Add `.limit(1000)` to match agents.
+**Status:** Fixed — added `.limit(1000)` to match agents route.
 
 ---
 
@@ -216,13 +210,10 @@ No `.limit()` on the initial query -- loads ALL public skills into memory for JS
 
 ---
 
-### Issue 20: Supabase clients not memoized
+### ~~Issue 20: Supabase clients not memoized~~ ✅
 **Files:** `frontend/lib/supabase.client.ts`, `frontend/lib/supabase.admin.ts`
 **Severity:** Low
-
-Both `getBrowserClient()` and `getAdminClient()` create new client instances on every call.
-
-**Fix:** Module-level singleton pattern.
+**Status:** Fixed in 30da6c2 — both functions now use module-level singleton caching. Red team verified safe across all call sites.
 
 ---
 
